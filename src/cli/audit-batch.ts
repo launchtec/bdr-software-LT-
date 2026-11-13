@@ -10,9 +10,9 @@
  * results without auditing again.
  *
  * The input file has one URL or domain per line; blank lines and lines starting with #
- * are skipped. Results are written as JSON Lines, one site per line.
+ * are skipped. Results are written as JSON Lines, one site per line, as each finishes.
  */
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { auditSite, launchBrowser, type SiteAudit } from '../audit';
 
@@ -132,6 +132,9 @@ const sites = (await readFile(listPath, 'utf8'))
   .map((line) => line.trim())
   .filter((line) => line && !line.startsWith('#'));
 
+await mkdir(dirname(outPath), { recursive: true });
+await writeFile(outPath, '');
+
 const browser = await launchBrowser();
 const results: SiteResult[] = new Array(sites.length);
 let next = 0;
@@ -149,6 +152,8 @@ async function worker(): Promise<void> {
       results[index] = { url, ok: false, seconds: (Date.now() - started) / 1000, error: message };
     }
     const r = results[index]!;
+    // Saved as each site finishes, so an interrupted run keeps what it has.
+    await appendFile(outPath, JSON.stringify(r) + '\n');
     console.error(`[${index + 1}/${sites.length}] ${r.ok ? 'ok  ' : 'FAIL'} ${url} (${r.seconds.toFixed(0)}s)`);
   }
 }
@@ -159,8 +164,6 @@ try {
   await browser.close();
 }
 
-await mkdir(dirname(outPath), { recursive: true });
-await writeFile(outPath, results.map((r) => JSON.stringify(r)).join('\n') + '\n');
 
 console.log(summarize(results));
 if (pushTo) await push(results);

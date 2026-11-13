@@ -8,7 +8,7 @@
  * With --push, results are sent to the web app's ingest API, authenticated with the
  * INGEST_TOKEN environment variable. Behind an HTTP proxy, run with NODE_USE_ENV_PROXY=1.
  */
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { checkGoogleAds, type GoogleAdsCheck } from '../adcheck/google';
 import { launchBrowser } from '../audit/collect';
@@ -42,6 +42,11 @@ if (inputs.length === 0) {
 }
 const domains = [...new Set(inputs.map(normalizeDomain))];
 
+if (outPath) {
+  await mkdir(dirname(outPath), { recursive: true });
+  await writeFile(outPath, '');
+}
+
 const browser = await launchBrowser();
 const checks: GoogleAdsCheck[] = [];
 const failures: string[] = [];
@@ -51,6 +56,8 @@ try {
     try {
       const check = await checkGoogleAds(domain, { browser });
       checks.push(check);
+      // Saved as each check finishes, so an interrupted run keeps what it has.
+      if (outPath) await appendFile(outPath, JSON.stringify(check) + '\n');
       console.log(`[${index + 1}/${domains.length}] ${domain}: ${describe(check)}`);
     } catch (error) {
       failures.push(domain);
@@ -65,11 +72,7 @@ try {
 const count = (status: string) => checks.filter((c) => c.status === status).length;
 console.log(`\nChecked ${checks.length} of ${domains.length}: ${count('active')} active, ${count('lapsed')} lapsed, ${count('none')} none, ${failures.length} not checked.`);
 
-if (outPath) {
-  await mkdir(dirname(outPath), { recursive: true });
-  await writeFile(outPath, checks.map((c) => JSON.stringify(c)).join('\n') + '\n');
-  console.log(`Results: ${outPath}`);
-}
+if (outPath) console.log(`Results: ${outPath}`);
 
 if (pushTo && checks.length > 0) {
   const endpoint = new URL('/api/ingest/ad-checks', pushTo).toString();
