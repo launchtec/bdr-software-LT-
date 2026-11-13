@@ -1,8 +1,9 @@
 /**
  * Visits a site in a headless browser and records what each page loads.
  *
- * The visit is read-only: it loads pages and watches the network. It never submits a
- * form, clicks a call button, or accepts a consent banner.
+ * The visit is read-only: it loads pages and watches the network. It moves the mouse and
+ * scrolls, because many sites hold their tags back until a visitor does, but it never
+ * clicks anything, submits a form, or accepts a consent banner.
  */
 import { chromium, type Browser, type BrowserContext, type LaunchOptions } from 'playwright';
 import type { PageCapture } from './types';
@@ -62,6 +63,14 @@ async function capturePage(context: BrowserContext, url: string, opts: Required<
   try {
     const response = await page.goto(url, { waitUntil: 'load', timeout: opts.navigationTimeoutMs });
     // Tag Manager fires most tags after load; wait for the network to go quiet, bounded.
+    await page.waitForLoadState('networkidle', { timeout: opts.settleMs * 3 }).catch(() => undefined);
+
+    // Speed plugins commonly delay scripts until the first mouse move, scroll or key
+    // press. Without this, such a site looks as if it had no tags at all.
+    await page.mouse.move(200, 300);
+    await page.mouse.move(420, 520, { steps: 5 });
+    await page.mouse.wheel(0, 600);
+    await page.keyboard.press('Shift');
     await page.waitForLoadState('networkidle', { timeout: opts.settleMs * 3 }).catch(() => undefined);
     await page.waitForTimeout(opts.settleMs);
 

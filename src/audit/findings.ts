@@ -76,6 +76,16 @@ export function deriveFindings(d: Detections): Finding[] {
     });
   }
 
+  if (d.ga4.length > 1) {
+    findings.push({
+      code: 'analytics.multiple_ga4',
+      confidence: 'observed',
+      statement: `${d.ga4.length} separate GA4 properties are collecting data from the site (${ids(d.ga4)}).`,
+      caveat: 'A second property can be intentional, for example an agency roll-up; several often means leftovers from previous vendors.',
+      evidence: evidenceOf(d.ga4),
+    });
+  }
+
   for (const [id, count] of Object.entries(d.ga4MaxPageViews)) {
     if (count < 2) continue;
     findings.push({
@@ -159,7 +169,16 @@ export function deriveFindings(d: Detections): Finding[] {
   }
 
   const vendorCredit = d.vendorCredits.find((c) => c.knownVendor);
-  if (vendorCredit) {
+  const hostVendor = d.marketingVendors[0];
+  if (hostVendor) {
+    findings.push({
+      code: 'vendor.templated_provider',
+      confidence: 'observed',
+      statement: `The site runs on ${hostVendor.vendor}'s platform.`,
+      caveat: null,
+      evidence: hostVendor.evidence,
+    });
+  } else if (vendorCredit) {
     findings.push({
       code: 'vendor.templated_provider',
       confidence: 'observed',

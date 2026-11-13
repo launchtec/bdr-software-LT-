@@ -114,6 +114,25 @@ describe('detect', () => {
     ]);
   });
 
+  it('does not let a credit run into the neighbouring element', () => {
+    const d = detect([
+      capture({ html: '<footer><p>Design by <a href="#">Red Egg Marketing</a></p><h4>Considering A New Fence?</h4></footer>' }),
+    ]);
+    expect(d.vendorCredits).toEqual([{ text: 'Design by Red Egg Marketing', knownVendor: null }]);
+  });
+
+  it('recognises a templated vendor and its platform from the hosts a site loads', () => {
+    const d = detect([
+      capture({
+        html: '<img src="https://lirp.cdn-website.com/abc/logo.png">',
+        requests: ['https://go.thryv.com/site/widget.js', 'https://www.clickcease.com/monitor/stat.js'],
+      }),
+    ]);
+    expect(d.marketingVendors.map((v) => v.vendor)).toEqual(['Thryv']);
+    expect(d.platform?.vendor).toBe('Duda');
+    expect(d.otherAdPixels.map((v) => v.vendor)).toEqual(['ClickCease (click-fraud protection)']);
+  });
+
   it('identifies the site platform', () => {
     const d = detect([capture({ html: '<link href="https://example.com/wp-content/themes/x/style.css">' })]);
     expect(d.platform?.vendor).toBe('WordPress');

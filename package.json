@@ -9,6 +9,7 @@
   },
   "scripts": {
     "audit": "tsx src/cli/audit.ts",
+    "audit:batch": "tsx src/cli/audit-batch.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",

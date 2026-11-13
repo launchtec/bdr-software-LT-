@@ -25,15 +25,26 @@ npm run audit -- example.com
 npm run audit -- example.com --json
 ```
 
+Audit a list of sites (one URL or domain per line) and summarize how often each finding occurs. Full results are written as JSON Lines under `audit-output/`, which is not committed:
+
+```bash
+npm run audit:batch -- sites.txt
+```
+
 How it stays honest:
 
-- Read-only. It never submits a form, clicks a call button, or accepts a consent banner.
+- Read-only. It moves the mouse and scrolls, because many sites delay their tags until a visitor does, but it never clicks anything, submits a form, or accepts a consent banner.
 - Every finding carries its evidence and is graded `observed` or `likely`; `likely` findings carry a caveat saying what an outside visit cannot see.
 - Findings that only matter if the company advertises are marked with that condition (`appliesWhen`), to be confirmed from the ad libraries.
 - A page that fails to load, or a bot-challenge page, raises `SiteNotAuditableError` instead of being reported as empty.
 - If a tag loader fails to download during the visit, every "not detected" finding is withheld and the audit says so under `limitations`.
 
-Known limits: it cannot tell whether a conversion actually fires (that would require submitting a form), cannot see conversions imported from GA4 or uploaded offline, and has only been run against fixtures and one live site so far. The vendor fingerprint lists in `src/audit/detect.ts` are a starting set to extend as they are verified.
+Known limits:
+
+- It cannot tell whether a conversion actually fires (that would require submitting a form), and cannot see conversions imported from GA4 or uploaded offline.
+- Findings marked `appliesWhen` mean nothing until an ad-library check confirms the company advertises; that check is not built yet.
+- Sites behind a Cloudflare bot challenge cannot be audited: 4 of 33 in the first real-site run (Colorado home-services companies, 2026-11-13).
+- The vendor fingerprint lists in `src/audit/detect.ts` are a starting set, extended as real sites reveal new ones.
 
 ## Setup
 

@@ -21,6 +21,15 @@ const ESTIMATE = `<!doctype html><html><head><title>Free Estimate</title>
   <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-FAKE001"></script>
   </head><body><form><input name="email"><button>Send</button></form></body></html>`;
 
+/** A site whose speed plugin holds Tag Manager back until the visitor first moves the mouse. */
+const DELAYED = `<!doctype html><html><head><title>Lazy Fence Co</title><script>
+  window.addEventListener('mousemove', function () {
+    var s = document.createElement('script');
+    s.src = 'https://www.googletagmanager.com/gtm.js?id=GTM-LAZY001';
+    document.head.appendChild(s);
+  }, { once: true });
+  </script></head><body style="height:3000px">Fences</body></html>`;
+
 /** Stands in for a Tag Manager container that fires GA4 twice and one Meta pixel. */
 const FAKE_GTM = `
   fetch('https://www.google-analytics.com/g/collect?v=2&tid=G-FAKEGA4001&en=page_view', { mode: 'no-cors' });
@@ -49,7 +58,7 @@ beforeAll(async () => {
       res.end('<html><head><title>502 Bad Gateway</title></head><body></body></html>');
       return;
     }
-    const body = req.url === '/' ? HOME : req.url === '/free-estimate' ? ESTIMATE : null;
+    const body = req.url === '/' ? HOME : req.url === '/free-estimate' ? ESTIMATE : req.url === '/delayed/' ? DELAYED : null;
     res.writeHead(body ? 200 : 404, { 'content-type': 'text/html' });
     res.end(body ?? 'not found');
   });
@@ -81,6 +90,13 @@ describe('auditSite (real browser, local site)', () => {
     expect(audit.findings.map((f) => f.code).sort()).toEqual(
       ['ads.no_google_ads_tag', 'analytics.double_pageview', 'calls.no_call_tracking', 'vendor.templated_provider'].sort(),
     );
+  });
+
+  it('sees tags that a speed plugin delays until the visitor moves the mouse', async () => {
+    const audit = await auditSite(`${base}/delayed/`, { browser, settleMs: 300, onContext: stubThirdParties });
+    expect(audit.detections.gtm.map((h) => h.id)).toEqual(['GTM-LAZY001']);
+    expect(audit.detections.ga4.map((h) => h.id)).toEqual(['G-FAKEGA4001']);
+    expect(audit.findings.map((f) => f.code)).not.toContain('analytics.none');
   });
 
   it('refuses to audit a page that did not load instead of reporting it as empty', async () => {

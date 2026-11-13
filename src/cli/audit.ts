@@ -34,6 +34,7 @@ function render(audit: SiteAudit): string {
   lines.push(list('Lead tools', vendorNames(d.leadTools)));
   lines.push(list('Consent manager', vendorNames(d.consentManagers)));
   lines.push(list('Platform', d.platform ? [d.platform.vendor] : []));
+  lines.push(list('Marketing vendor', vendorNames(d.marketingVendors)));
   lines.push(list('Site credits', d.vendorCredits.map((c) => c.text)));
   lines.push(list('Phone numbers', d.phoneNumbers));
   lines.push(list('Forms', [String(d.formCount)]));

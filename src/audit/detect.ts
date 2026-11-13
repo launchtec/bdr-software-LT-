@@ -9,8 +9,16 @@ import type { Detections, PageCapture, TagHit, VendorHit } from './types';
 const MAX_EVIDENCE = 3;
 
 /** Vendor fingerprints matched against request hostnames (suffix match). Extend as new ones are verified. */
-const HOST_VENDORS: Record<'otherAdPixels' | 'callTracking' | 'leadTools' | 'consentManagers', Record<string, string[]>> = {
+const HOST_VENDORS: Record<
+  'otherAdPixels' | 'callTracking' | 'leadTools' | 'consentManagers' | 'marketingVendors',
+  Record<string, string[]>
+> = {
+  marketingVendors: {
+    Thryv: ['thryv.com'],
+  },
   otherAdPixels: {
+    // Click-fraud protection is only bought by companies running paid search.
+    'ClickCease (click-fraud protection)': ['clickcease.com'],
     'Microsoft Ads (UET)': ['bat.bing.com'],
     'LinkedIn Insight': ['snap.licdn.com', 'px.ads.linkedin.com'],
     TikTok: ['analytics.tiktok.com'],
@@ -48,7 +56,9 @@ const HOST_VENDORS: Record<'otherAdPixels' | 'callTracking' | 'leadTools' | 'con
 
 const PLATFORM_PATTERNS: [string, RegExp][] = [
   ['Shopify', /cdn\.shopify\.com/i],
-  ['Wix', /static\.wixstatic\.com|static\.parastorage\.com/i],
+  ['Wix', /wixstatic\.com|parastorage\.com/i],
+  ['Duda', /multiscreensite\.com|cdn-website\.com/i],
+  ['GoDaddy Website Builder', /img1\.wsimg\.com/i],
   ['Squarespace', /static1\.squarespace\.com|squarespace-cdn\.com/i],
   ['Webflow', /data-wf-site=|website-files\.com/i],
   ['WordPress', /\/wp-content\/|\/wp-includes\//i],
@@ -57,9 +67,13 @@ const PLATFORM_PATTERNS: [string, RegExp][] = [
 /** Large templated marketing vendors whose clients are worth a closer look. Matched only inside a site credit. */
 const KNOWN_VENDORS = ['Scorpion', 'Hibu', 'Thryv', 'Townsquare Interactive', 'RevLocal', 'LocaliQ', 'Web.com'];
 
-/** Matches "Website by Some Agency"; the name is trimmed to its leading capitalized words afterwards. */
+/**
+ * Matches "Website by Some Agency" in text where element boundaries are newlines. The
+ * name may start on the next line (it is often a link) but may not span lines, and is
+ * trimmed to its leading capitalized words afterwards.
+ */
 const CREDIT_PATTERN =
-  /\b(?:web\s?site|site|web design|design(?:ed)?|built|developed|powered|marketing|seo)\s+(?:(?:&|and)\s+\w+\s+)?by:?\s+((?:[\w&.'-]+\s*){1,4})/gi;
+  /\b(?:web[ \t]?site|site|web design|design(?:ed)?|built|developed|powered|marketing|seo)[ \t]+(?:(?:&|and)[ \t]+\w+[ \t]+)?by:?\s+((?:[\w&.'-]+[ \t]*){1,4})/gi;
 
 function parseUrl(raw: string): URL | null {
   try {
@@ -108,6 +122,18 @@ export function visibleText(html: string): string {
     .trim();
 }
 
+/** Like visibleText, but every tag becomes a line break so separate elements stay separate. */
+function textByElement(html: string): string {
+  return html
+    .replace(/<(script|style|noscript|svg|template)\b[\s\S]*?<\/\1>/gi, '\n')
+    .replace(/<!--[\s\S]*?-->/g, '\n')
+    .replace(/<[^>]+>/g, '\n')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/ ?\n[\s]*/g, '\n');
+}
+
 function matchAll(text: string, pattern: RegExp, onMatch: (m: RegExpExecArray) => void): void {
   const re = new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`);
   let m: RegExpExecArray | null;
@@ -137,6 +163,7 @@ export function detect(captures: PageCapture[]): Detections {
     callTracking: new HitMap(),
     leadTools: new HitMap(),
     consentManagers: new HitMap(),
+    marketingVendors: new HitMap(),
   };
   const ga4MaxPageViews: Record<string, number> = {};
   const metaMaxPageViews: Record<string, number> = {};
@@ -235,7 +262,7 @@ export function detect(captures: PageCapture[]): Detections {
       }
     }
 
-    matchAll(visibleText(html), CREDIT_PATTERN, (m) => {
+    matchAll(textByElement(html), CREDIT_PATTERN, (m) => {
       const words = m[1]!.trim().split(/\s+/);
       const nameWords: string[] = [];
       for (const word of words) {
@@ -268,6 +295,7 @@ export function detect(captures: PageCapture[]): Detections {
     leadTools: vendorMaps.leadTools.vendors(),
     consentManagers: vendorMaps.consentManagers.vendors(),
     platform,
+    marketingVendors: vendorMaps.marketingVendors.vendors(),
     vendorCredits: [...credits.values()],
     phoneNumbers: [...phoneNumbers],
     formCount,

@@ -55,6 +55,8 @@ export interface Detections {
   leadTools: VendorHit[];
   consentManagers: VendorHit[];
   platform: VendorHit | null;
+  /** Large templated marketing vendors recognised from the hosts the site loads. */
+  marketingVendors: VendorHit[];
   /** "Website by …" style credits found in the page text. */
   vendorCredits: { text: string; knownVendor: string | null }[];
   phoneNumbers: string[];

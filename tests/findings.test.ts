@@ -127,6 +127,21 @@ describe('deriveFindings', () => {
     expect(codes(tracked)).not.toContain('calls.no_call_tracking');
   });
 
+  it('reports several GA4 properties as an observed fact with a caveat', () => {
+    const d = detections('', [GA4, 'https://www.google-analytics.com/g/collect?tid=G-OTHER00002&en=page_view', ADS, PIXEL]);
+    const f = find(d, 'analytics.multiple_ga4');
+    expect(f).toMatchObject({ confidence: 'observed' });
+    expect(f?.statement).toContain('2 separate GA4 properties');
+    expect(f?.caveat).toBeTruthy();
+  });
+
+  it('reports a templated vendor recognised from the hosts the site loads', () => {
+    const d = detections('', [GA4, ADS, PIXEL, 'https://cdn.website.thryv.com/x.js']);
+    const f = find(d, 'vendor.templated_provider');
+    expect(f?.statement).toBe("The site runs on Thryv's platform.");
+    expect(f?.evidence).toEqual(['https://cdn.website.thryv.com/x.js']);
+  });
+
   it('reports a known templated vendor credit', () => {
     const d = detections('<footer>Website by Hibu</footer>', [GA4, ADS, PIXEL]);
     expect(find(d, 'vendor.templated_provider')?.statement).toContain('Hibu');
