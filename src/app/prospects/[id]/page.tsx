@@ -94,6 +94,12 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
                 <>
                   <strong>Lapsed.</strong> {googleAds.adCount} ads listed, but none shown since {googleAds.lastShown}.
                 </>
+              ) : googleAds.advertisers.some((a) => a.thirdParty) ? (
+                <>
+                  <strong>No ads of its own.</strong> The only ads pointing to this domain are run by{' '}
+                  {googleAds.advertisers.filter((a) => a.thirdParty).map((a) => a.name).join(', ')}, a third-party
+                  programme, not by the company.
+                </>
               ) : (
                 <>
                   <strong>None listed.</strong> Google&apos;s ad library shows no ads pointing to this domain.
@@ -101,7 +107,12 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
               )}
             </p>
             <p className="muted small" style={{ margin: '8px 0 0' }}>
-              {googleAds.advertisers.length > 0 ? <>Advertiser: {googleAds.advertisers.map((a) => a.name).join(', ')} · </> : null}
+              {googleAds.advertisers.some((a) => !a.thirdParty) ? (
+                <>
+                  Ad account: {googleAds.advertisers.filter((a) => !a.thirdParty).map((a) => a.name).join(', ')} (if that is not
+                  the company&apos;s own name, it is usually their agency) ·{' '}
+                </>
+              ) : null}
               Checked {googleAds.checkedAt.toISOString().slice(0, 10)} ·{' '}
               <a href={googleAds.sourceUrl} target="_blank" rel="noreferrer noopener">
                 See it in Google&apos;s Ads Transparency Center

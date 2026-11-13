@@ -20,8 +20,8 @@ function option(args: string[], name: string): string | undefined {
 }
 
 function describe(check: GoogleAdsCheck): string {
-  if (check.status === 'none') return 'no Google ads listed';
-  const who = check.advertisers.map((a) => a.name).join(', ');
+  const who = check.advertisers.map((a) => (a.thirdParty ? `${a.name} [third-party programme]` : a.name)).join(', ');
+  if (check.status === 'none') return who ? `no ads of its own (only: ${who})` : 'no Google ads listed';
   return `${check.status}: ${check.adCount} ads, last shown ${check.lastShown ?? 'unknown'}, first ${check.firstShown ?? 'unknown'} (${who})`;
 }
 

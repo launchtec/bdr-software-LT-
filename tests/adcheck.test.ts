@@ -50,8 +50,8 @@ describe('parseSearchCreatives', () => {
       sourceUrl: 'https://adstransparency.google.com/?region=US&domain=acme.test',
     });
     expect(check.advertisers).toEqual([
-      { id: 'AR1', name: 'Acme Fence LLC' },
-      { id: 'AR2', name: 'Acme Holdings' },
+      { id: 'AR1', name: 'Acme Fence LLC', adCount: 2, lastShown: '2026-11-13', thirdParty: false },
+      { id: 'AR2', name: 'Acme Holdings', adCount: 1, lastShown: '2026-11-01', thirdParty: false },
     ]);
   });
 
@@ -60,6 +60,32 @@ describe('parseSearchCreatives', () => {
     expect(lapsed.status).toBe('lapsed');
     const edge = parseSearchCreatives('acme.test', body([{ format: 1, first: '2025-01-01T00:00:00Z', last: '2026-10-15T00:00:00Z' }]), NOW);
     expect(edge.status).toBe('active');
+  });
+
+  it('does not count ads that a third-party programme runs on the company\'s behalf', () => {
+    const bbbOnly = parseSearchCreatives(
+      'member.test',
+      body([
+        { format: 1, first: '2023-04-21T00:00:00Z', last: '2026-11-13T00:00:00Z', advertiser: 'AR9', name: 'Better Business Bureau Great West & Pacific, Inc.' },
+        { format: 1, first: '2023-04-21T00:00:00Z', last: '2026-11-12T00:00:00Z', advertiser: 'AR9', name: 'Better Business Bureau Great West & Pacific, Inc.' },
+      ]),
+      NOW,
+    );
+    expect(bbbOnly).toMatchObject({ status: 'none', adCount: 0, firstShown: null, lastShown: null, formats: { text: 0, image: 0, video: 0 } });
+    expect(bbbOnly.advertisers).toEqual([
+      { id: 'AR9', name: 'Better Business Bureau Great West & Pacific, Inc.', adCount: 2, lastShown: '2026-11-13', thirdParty: true },
+    ]);
+
+    const mixed = parseSearchCreatives(
+      'mixed.test',
+      body([
+        { format: 1, first: '2026-01-01T00:00:00Z', last: '2026-11-13T00:00:00Z', advertiser: 'AR9', name: 'Better Business Bureau Great West & Pacific, Inc.' },
+        { format: 2, first: '2026-02-01T00:00:00Z', last: '2026-08-01T00:00:00Z', advertiser: 'AR1', name: 'Plum Digital Marketing LLC' },
+      ]),
+      NOW,
+    );
+    // The company's own ads (through its agency) stopped in August; the bureau's ads do not make it active.
+    expect(mixed).toMatchObject({ status: 'lapsed', adCount: 1, firstShown: '2026-02-01', lastShown: '2026-08-01' });
   });
 
   it('treats the empty object as "no ads"', () => {

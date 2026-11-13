@@ -129,7 +129,7 @@ export interface AdCheckIngest {
   platform: 'google';
   status: 'active' | 'lapsed' | 'none';
   adCount: number;
-  advertisers: { id: string; name: string }[];
+  advertisers: { id: string; name: string; adCount?: number; lastShown?: string | null; thirdParty?: boolean }[];
   formats?: Record<string, number>;
   firstShown: string | null;
   lastShown: string | null;

@@ -11,15 +11,38 @@ export const ACTIVE_WINDOW_DAYS = 30;
 
 export type AdStatus = 'active' | 'lapsed' | 'none';
 
+/**
+ * Organisations that run ads promoting their members or listed businesses from their own
+ * ad account. Ads from these point at a company's site without the company running, or
+ * necessarily knowing the details of, a Google Ads account.
+ */
+const THIRD_PARTY_PROGRAMS = /better business bureau|\bbbb\b|\byelp\b|\bangi\b|angie'?s list|homeadvisor|thumbtack|\bhouzz\b|nextdoor|\bporch\b/i;
+
+export function isThirdPartyProgram(advertiserName: string): boolean {
+  return THIRD_PARTY_PROGRAMS.test(advertiserName);
+}
+
+export interface Advertiser {
+  id: string;
+  name: string;
+  /** Ads from this account among those listed. */
+  adCount: number;
+  /** YYYY-MM-DD */
+  lastShown: string | null;
+  /** True for a directory or membership body advertising on the company's behalf. */
+  thirdParty: boolean;
+}
+
 export interface GoogleAdsCheck {
   platform: 'google';
   domain: string;
   region: 'US';
   checkedAt: string;
+  /** Based only on ads from the company's own account or its agency, not third-party programs. */
   status: AdStatus;
-  /** Ads the library lists for the domain. */
+  /** Ads the library lists for the domain, third-party programs excluded. */
   adCount: number;
-  advertisers: { id: string; name: string }[];
+  advertisers: Advertiser[];
   formats: { text: number; image: number; video: number };
   /** ISO dates (YYYY-MM-DD) across the listed ads. */
   firstShown: string | null;
@@ -71,24 +94,39 @@ export function parseSearchCreatives(domain: string, body: string, now: Date = n
   }
   const creatives = (data['1'] ?? []) as RawCreative[];
 
-  const advertisers = new Map<string, string>();
+  const accounts = new Map<string, { name: string; adCount: number; last: number; thirdParty: boolean }>();
   const formats = { text: 0, image: 0, video: 0 };
   let first = Infinity;
   let last = -Infinity;
+  let thirdPartyAds = 0;
 
   for (const creative of creatives) {
-    if (creative['1']) advertisers.set(creative['1'], creative['12'] ?? 'Unknown advertiser');
+    const name = creative['12'] ?? 'Unknown advertiser';
+    const thirdParty = isThirdPartyProgram(name);
+    const firstShown = Number(creative['6']?.['1']);
+    const lastShown = Number(creative['7']?.['1']);
+
+    const id = creative['1'] ?? name;
+    const account = accounts.get(id) ?? { name, adCount: 0, last: -Infinity, thirdParty };
+    account.adCount += 1;
+    if (Number.isFinite(lastShown) && lastShown > 0) account.last = Math.max(account.last, lastShown);
+    accounts.set(id, account);
+
+    if (thirdParty) {
+      thirdPartyAds += 1;
+      continue;
+    }
+
     if (creative['4'] === 1) formats.text += 1;
     else if (creative['4'] === 2) formats.image += 1;
     else if (creative['4'] === 3) formats.video += 1;
-
-    const firstShown = Number(creative['6']?.['1']);
-    const lastShown = Number(creative['7']?.['1']);
     if (Number.isFinite(firstShown) && firstShown > 0) first = Math.min(first, firstShown);
     if (Number.isFinite(lastShown) && lastShown > 0) last = Math.max(last, lastShown);
   }
 
-  const total = Math.max(creatives.length, Number(data['5'] ?? data['4'] ?? 0) || 0);
+  // The library reports a total for the whole domain; take the third-party ads we saw out of it.
+  const listed = Math.max(creatives.length, Number(data['5'] ?? data['4'] ?? 0) || 0);
+  const total = Math.max(0, listed - thirdPartyAds);
   let status: AdStatus = 'none';
   if (total > 0) {
     // Without a last-shown date we cannot call the advertiser active.
@@ -103,7 +141,13 @@ export function parseSearchCreatives(domain: string, body: string, now: Date = n
     checkedAt: now.toISOString(),
     status,
     adCount: total,
-    advertisers: [...advertisers].map(([id, name]) => ({ id, name })),
+    advertisers: [...accounts].map(([id, a]) => ({
+      id,
+      name: a.name,
+      adCount: a.adCount,
+      lastShown: Number.isFinite(a.last) ? isoDate(a.last) : null,
+      thirdParty: a.thirdParty,
+    })),
     formats,
     firstShown: Number.isFinite(first) ? isoDate(first) : null,
     lastShown: Number.isFinite(last) ? isoDate(last) : null,

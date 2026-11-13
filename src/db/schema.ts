@@ -239,7 +239,10 @@ export const adChecks = pgTable(
     platform: adPlatformEnum('platform').notNull(),
     status: adStatusEnum('status').notNull(),
     adCount: integer('ad_count').notNull(),
-    advertisers: jsonb('advertisers').$type<{ id: string; name: string }[]>().notNull().default([]),
+    advertisers: jsonb('advertisers')
+      .$type<{ id: string; name: string; adCount?: number; lastShown?: string | null; thirdParty?: boolean }[]>()
+      .notNull()
+      .default([]),
     formats: jsonb('formats').$type<Record<string, number>>(),
     /** YYYY-MM-DD */
     firstShown: text('first_shown'),
