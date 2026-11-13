@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { findingLabel } from '@/audit/labels';
+import { listOutreach } from '@/lib/outreach-queries';
 import { PIPELINE, STATE_LABEL } from '@/lib/pipeline';
 import { findingState, isConditional, listProspects } from '@/lib/queries';
 import { shortlistReason } from '@/lib/shortlist';
@@ -13,7 +14,12 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 export default async function OverviewPage() {
-  const prospects = await listProspects();
+  const [prospects, outreach] = await Promise.all([listProspects(), listOutreach()]);
+  const withState = (test: (c: (typeof outreach)[number]) => boolean) => new Set(outreach.filter(test).map((c) => c.company.id));
+  const drafted = withState(() => true);
+  const contacted = withState((c) => c.messages.some((m) => m.touch.status === 'sent'));
+  const replied = withState((c) => c.messages.some((m) => m.reply !== null));
+  const interested = withState((c) => c.messages.some((m) => m.reply?.classification === 'positive'));
   const audited = prospects.filter((p) => p.audit?.status === 'ok');
   const adChecked = prospects.filter((p) => p.googleAds);
   const advertising = prospects.filter((p) => p.googleAds?.status === 'active');
@@ -35,8 +41,10 @@ export default async function OverviewPage() {
       advertising: rows.filter((p) => p.googleAds?.status === 'active').length,
       withGap: rows.filter((p) => advertisingWithGap.includes(p)).length,
       shortlisted: rows.filter((p) => shortlist.includes(p)).length,
-      goodFit: rows.filter((p) => p.company.fitVerdict === 'good_fit').length,
-      notFit: rows.filter((p) => p.company.fitVerdict && p.company.fitVerdict !== 'good_fit').length,
+      drafted: rows.filter((p) => drafted.has(p.company.id)).length,
+      contacted: rows.filter((p) => contacted.has(p.company.id)).length,
+      replied: rows.filter((p) => replied.has(p.company.id)).length,
+      interested: rows.filter((p) => interested.has(p.company.id)).length,
     };
   });
 
@@ -102,8 +110,10 @@ export default async function OverviewPage() {
                 <th className="num">Running Google ads</th>
                 <th className="num">With tracking gap</th>
                 <th className="num">Shortlisted</th>
-                <th className="num">You: good fit</th>
-                <th className="num">You: not a fit</th>
+                <th className="num">Messages drafted</th>
+                <th className="num">Contacted</th>
+                <th className="num">Replied</th>
+                <th className="num">Interested</th>
               </tr>
             </thead>
             <tbody>
@@ -115,8 +125,10 @@ export default async function OverviewPage() {
                   <td className="num">{row.advertising}</td>
                   <td className="num">{row.withGap}</td>
                   <td className="num">{row.shortlisted}</td>
-                  <td className="num">{row.goodFit}</td>
-                  <td className="num">{row.notFit}</td>
+                  <td className="num">{row.drafted}</td>
+                  <td className="num">{row.contacted}</td>
+                  <td className="num">{row.replied}</td>
+                  <td className="num">{row.interested}</td>
                 </tr>
               ))}
             </tbody>
@@ -124,8 +136,8 @@ export default async function OverviewPage() {
         )}
       </div>
       <p className="muted small">
-        Each sourcing method gets its own row, so they can be compared on what they produce. Later stages (contacted,
-        replied, calls booked) will extend this table to the right.
+        Each sourcing method gets its own row, so they can be compared on what they produce, all the way to replies.
+        Booked calls and closed work will extend this table to the right.
       </p>
 
       <h2>Usable findings</h2>

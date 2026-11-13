@@ -2,7 +2,7 @@
 
 Software that finds prospects from observable signals, audits each one before anyone writes to them, runs one coordinated sequence per person across email, LinkedIn and Instagram, and records what works.
 
-The plan, including channels, sourcing signals, costs and open decisions, is in [docs/plan.md](docs/plan.md).
+The plan, including channels, sourcing signals, costs and open decisions, is in [docs/plan.md](docs/plan.md). What the messages say, and why, is in [docs/messaging.md](docs/messaging.md).
 
 ## What exists today
 
