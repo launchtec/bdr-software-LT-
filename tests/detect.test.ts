@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detect, visibleText } from '../src/audit/detect';
+import { detect, socialProfilesIn, visibleText } from '../src/audit/detect';
 import { pickLeadPage } from '../src/audit/collect';
 import type { PageCapture } from '../src/audit/types';
 
@@ -182,6 +182,44 @@ describe('detect', () => {
   it('identifies the site platform', () => {
     const d = detect([capture({ html: '<link href="https://example.com/wp-content/themes/x/style.css">' })]);
     expect(d.platform?.vendor).toBe('WordPress');
+  });
+});
+
+describe('social profiles', () => {
+  it('finds the profile a site links to on each network', () => {
+    const html = `<footer>
+      <a href="https://www.facebook.com/AcmeRoofingDenver/">Facebook</a>
+      <a href="https://www.instagram.com/acme.roofing/?hl=en">Instagram</a>
+      <a href="https://www.linkedin.com/company/acme-roofing">LinkedIn</a>
+      <a href="https://www.youtube.com/@acmeroofing">YouTube</a>
+      <a href="https://www.tiktok.com/@acmeroofing">TikTok</a>
+    </footer>`;
+    expect(socialProfilesIn(html)).toEqual([
+      { network: 'facebook', url: 'https://www.facebook.com/AcmeRoofingDenver' },
+      { network: 'instagram', url: 'https://www.instagram.com/acme.roofing' },
+      { network: 'linkedin', url: 'https://www.linkedin.com/company/acme-roofing' },
+      { network: 'youtube', url: 'https://www.youtube.com/@acmeroofing' },
+      { network: 'tiktok', url: 'https://www.tiktok.com/@acmeroofing' },
+    ]);
+  });
+
+  it('ignores share buttons, embedded posts and tracking pixels', () => {
+    const html = `<a href="https://www.facebook.com/sharer/sharer.php?u=x">Share</a>
+      <img src="https://www.facebook.com/tr?id=123&ev=PageView">
+      <a href="https://www.instagram.com/p/Cabc123/">A post</a>
+      <a href="https://www.linkedin.com/shareArticle?url=x">Share</a>`;
+    expect(socialProfilesIn(html)).toEqual([]);
+  });
+
+  it('keeps the first profile per network across pages', () => {
+    const d = detect([
+      capture({ html: '<a href="https://facebook.com/first.page">fb</a>' }),
+      capture({ html: '<a href="https://facebook.com/second.page">fb</a><a href="https://instagram.com/acme">ig</a>' }),
+    ]);
+    expect(d.socialProfiles).toEqual([
+      { network: 'facebook', url: 'https://facebook.com/first.page' },
+      { network: 'instagram', url: 'https://instagram.com/acme' },
+    ]);
   });
 });
 

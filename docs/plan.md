@@ -130,4 +130,6 @@ AI research and drafting cost is usage-based and not yet priced. Prices came fro
 
 - LinkedIn sending mode: assist (a person clicks send) or automated. Linked Helper has been used on the account before; whether it can take per-prospect messages from this system is unverified.
 - Past data to import: Instantly campaign exports (to tell a deliverability problem from a messaging problem, and to build a do-not-repeat list) and Linked Helper exports (who accepted and replied; existing connections as a warm pool).
+- Email: fully self-run. Domains and Google Workspace mailboxes owned outright, sending and reply reading built into this app through Gmail, a flat-fee warm-up tool for the first two months. The domains bought through Instantly cannot be transferred out and are written off.
+- Channel reach, measured on 131 home-services sites (2026-11-13): 76% link a Facebook page, 50% Instagram, 27% LinkedIn (mostly company pages, rarely the owner). For this segment Facebook and Instagram are likelier ways in than LinkedIn; to be tested, not assumed.
 - Hosting: the app is set up for Render's free web service with a free Neon database, which is enough to review work in progress. The free web service sleeps when idle; move to a paid instance (about $7 a month) once the app is used daily or runs scheduled work.

@@ -11,6 +11,15 @@ export const dynamic = 'force-dynamic';
 
 const join = (values: string[]) => (values.length ? values.join(', ') : '—');
 
+const NETWORK_NAMES: Record<string, string> = {
+  facebook: 'Facebook',
+  instagram: 'Instagram',
+  linkedin: 'LinkedIn',
+  youtube: 'YouTube',
+  tiktok: 'TikTok',
+  nextdoor: 'Nextdoor',
+};
+
 function facts(d: Detections): [string, string][] {
   return [
     ['Tag Manager', join([...d.gtm, ...d.googleTag].map((t) => t.id))],
@@ -161,6 +170,29 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
 
           {audit.detections ? (
             <>
+              <h2>Where they can be reached</h2>
+              <div className="panel" style={{ padding: '14px 18px' }}>
+                {audit.detections.socialProfiles === undefined ? (
+                  <span className="muted">Not collected yet for this company.</span>
+                ) : audit.detections.socialProfiles.length === 0 ? (
+                  <span className="muted">The site links to no social profiles.</span>
+                ) : (
+                  <div className="chips">
+                    {audit.detections.socialProfiles.map((profile) => (
+                      <a key={profile.network} className="chip" href={profile.url} target="_blank" rel="noreferrer noopener">
+                        {NETWORK_NAMES[profile.network] ?? profile.network} ↗
+                      </a>
+                    ))}
+                  </div>
+                )}
+                {typeof company.sourceRef?.phone === 'string' ? (
+                  <p className="muted small" style={{ margin: '10px 0 0' }}>
+                    Phone on its Maps listing: {company.sourceRef.phone}
+                    {typeof company.sourceRef?.address === 'string' ? <> · {company.sourceRef.address}</> : null}
+                  </p>
+                ) : null}
+              </div>
+
               <h2>What the site runs</h2>
               <div className="panel">
                 <dl className="facts">

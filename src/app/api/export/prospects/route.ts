@@ -26,6 +26,8 @@ export async function GET(request: Request) {
       googleAds: p.googleAds
         ? { status: p.googleAds.status, adCount: p.googleAds.adCount, lastShown: p.googleAds.lastShown, firstShown: p.googleAds.firstShown }
         : null,
+      socialNetworks: p.audit?.detections?.socialProfiles?.map((s) => s.network) ?? null,
+      source: p.company.source,
       findings: p.signals.map((s) => ({ code: s.code, state: findingState(s, p.googleAds) })),
     })),
   });

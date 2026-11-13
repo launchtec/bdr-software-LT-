@@ -68,6 +68,18 @@ export interface Detections {
   vendorCredits: { text: string; knownVendor: string | null }[];
   phoneNumbers: string[];
   formCount: number;
+  /**
+   * Social profiles the site links to: which channels the company can be reached on.
+   * Absent on audits stored before this was collected.
+   */
+  socialProfiles?: SocialProfile[];
+}
+
+export type SocialNetwork = 'facebook' | 'instagram' | 'linkedin' | 'youtube' | 'tiktok' | 'nextdoor';
+
+export interface SocialProfile {
+  network: SocialNetwork;
+  url: string;
 }
 
 export type Confidence = 'observed' | 'likely';

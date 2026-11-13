@@ -4,7 +4,7 @@
  * Network requests are the primary source because Tag Manager injects tags at runtime;
  * the HTML is a fallback for tags that are present but did not fire during the visit.
  */
-import type { Detections, PageCapture, TagHit, VendorHit } from './types';
+import type { Detections, PageCapture, SocialNetwork, SocialProfile, TagHit, VendorHit } from './types';
 
 const MAX_EVIDENCE = 3;
 
@@ -74,6 +74,26 @@ const KNOWN_VENDORS = ['Scorpion', 'Hibu', 'Thryv', 'Townsquare Interactive', 'R
  */
 const CREDIT_PATTERN =
   /\b(?:web[ \t]?site|site|web design|design(?:ed)?|built|developed|powered|marketing|seo)[ \t]+(?:(?:&|and)[ \t]+\w+[ \t]+)?by:?\s+((?:[\w&.'-]+[ \t]*){1,4})/gi;
+
+/** Links to a profile or page, skipping share buttons, post links and the networks' own utility pages. */
+const SOCIAL_PATTERNS: [SocialNetwork, RegExp][] = [
+  ['facebook', /https?:\/\/(?:www\.|m\.)?facebook\.com\/(?!sharer|share\b|plugins|tr\b|dialog|login|policies|privacy|help|legal|events\/|hashtag\/)[A-Za-z0-9.\-_]{3,80}(?:\/[A-Za-z0-9.\-_]+)*/i],
+  ['instagram', /https?:\/\/(?:www\.)?instagram\.com\/(?!p\/|reel\/|explore\/|accounts\/)[A-Za-z0-9._]{2,40}/i],
+  ['linkedin', /https?:\/\/(?:www\.)?linkedin\.com\/(?:company|in)\/[A-Za-z0-9\-_%]{2,80}/i],
+  ['youtube', /https?:\/\/(?:www\.)?youtube\.com\/(?:@|channel\/|c\/|user\/)[A-Za-z0-9\-_@]{2,60}/i],
+  ['tiktok', /https?:\/\/(?:www\.)?tiktok\.com\/@[A-Za-z0-9._]{2,40}/i],
+  ['nextdoor', /https?:\/\/(?:www\.)?nextdoor\.com\/pages?\/[A-Za-z0-9\-_]{2,80}/i],
+];
+
+/** The first profile the page links to on each network. */
+export function socialProfilesIn(html: string): SocialProfile[] {
+  const found: SocialProfile[] = [];
+  for (const [network, pattern] of SOCIAL_PATTERNS) {
+    const match = pattern.exec(html);
+    if (match) found.push({ network, url: match[0].replace(/[/.]+$/, '') });
+  }
+  return found;
+}
 
 function parseUrl(raw: string): URL | null {
   try {
@@ -172,6 +192,7 @@ export function detect(captures: PageCapture[]): Detections {
   let platform: VendorHit | null = null;
   let googleCallConversion = false;
   let metaPixelLibrary = false;
+  const social = new Map<SocialNetwork, SocialProfile>();
   let tagLoaderFailed = false;
   let formCount = 0;
 
@@ -268,6 +289,8 @@ export function detect(captures: PageCapture[]): Detections {
 
     if (/phone_conversion_number/.test(html)) googleCallConversion = true;
 
+    for (const profile of socialProfilesIn(html)) if (!social.has(profile.network)) social.set(profile.network, profile);
+
     matchAll(html, /href\s*=\s*["']tel:([^"']+)["']/i, (m) => {
       // Keep the national number so "(720) 555-0100" and "+17205550100" count once.
       const digits = m[1]!.replace(/%20/g, '').replace(/\D/g, '');
@@ -324,5 +347,6 @@ export function detect(captures: PageCapture[]): Detections {
     vendorCredits: [...credits.values()],
     phoneNumbers: [...phoneNumbers],
     formCount,
+    socialProfiles: [...social.values()],
   };
 }
