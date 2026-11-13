@@ -19,6 +19,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
+import type { Detections } from '../audit/types';
 
 const id = () => uuid('id').primaryKey().defaultRandom();
 const createdAt = () => timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
@@ -190,6 +191,32 @@ export const signals = pgTable(
     expiresAt: timestamp('expires_at', { withTimezone: true }),
   },
   (t) => [index('signals_company_code_idx').on(t.companyId, t.code)],
+);
+
+export const auditStatusEnum = pgEnum('audit_status', ['ok', 'not_auditable']);
+
+/**
+ * One visit by the site audit: what was installed, or why the site could not be audited.
+ * Findings derived from it live in `signals`.
+ */
+export const siteAudits = pgTable(
+  'site_audits',
+  {
+    id: id(),
+    companyId: uuid('company_id')
+      .notNull()
+      .references(() => companies.id, { onDelete: 'cascade' }),
+    url: text('url').notNull(),
+    status: auditStatusEnum('status').notNull(),
+    /** Why the site could not be audited, when status is `not_auditable`. */
+    error: text('error'),
+    pageTitle: text('page_title'),
+    detections: jsonb('detections').$type<Detections>(),
+    limitations: jsonb('limitations').$type<string[]>().notNull().default([]),
+    auditedAt: timestamp('audited_at', { withTimezone: true }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index('site_audits_company_idx').on(t.companyId, t.auditedAt)],
 );
 
 export const experiments = pgTable(

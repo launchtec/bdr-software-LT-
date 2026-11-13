@@ -3,6 +3,11 @@
  *
  *   npm run audit:batch -- sites.txt
  *   npm run audit:batch -- sites.txt --out audit-output/denver.jsonl --concurrency 4
+ *   npm run audit:batch -- sites.txt --push https://your-app.example.com --segment home_services
+ *
+ * With --push, results are also sent to the web app's ingest API, authenticated with the
+ * INGEST_TOKEN environment variable. --resume <file.jsonl> pushes an earlier run's
+ * results without auditing again.
  *
  * The input file has one URL or domain per line; blank lines and lines starting with #
  * are skipped. Results are written as JSON Lines, one site per line.
@@ -81,14 +86,46 @@ function summarize(results: SiteResult[]): string {
 }
 
 const args = process.argv.slice(2);
-const listPath = args.find((a, i) => !a.startsWith('--') && !args[i - 1]?.startsWith('--'));
-if (!listPath) {
+const listPath = args.find((a, i) => !a.startsWith('--') && !args[i - 1]?.startsWith('--')) ?? '';
+if (!listPath && !args.includes('--resume')) {
   console.error('Usage: npm run audit:batch -- <file-with-one-site-per-line> [--out file.jsonl] [--concurrency n]');
   process.exit(1);
 }
 
 const outPath = option(args, '--out') ?? `audit-output/batch-${new Date().toISOString().replace(/[:.]/g, '-')}.jsonl`;
 const concurrency = Math.max(1, Number(option(args, '--concurrency') ?? 3));
+
+const pushTo = option(args, '--push');
+const segment = option(args, '--segment');
+const source = option(args, '--source') ?? 'manual';
+
+async function push(batch: SiteResult[]): Promise<void> {
+  const endpoint = new URL('/api/ingest/audits', pushTo).toString();
+  const audits = batch.map((r) => ({ url: r.url, segment, source, audit: r.audit, error: r.audit ? undefined : (r.error ?? 'unknown error') }));
+  for (let i = 0; i < audits.length; i += 25) {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${process.env.INGEST_TOKEN ?? ''}` },
+      body: JSON.stringify({ audits: audits.slice(i, i + 25) }),
+    });
+    if (!response.ok) throw new Error(`Push failed: HTTP ${response.status} ${(await response.text()).slice(0, 200)}`);
+  }
+  console.log(`Pushed ${audits.length} results to ${endpoint}`);
+}
+
+const resumeFrom = option(args, '--resume');
+if (resumeFrom) {
+  if (!pushTo) {
+    console.error('--resume needs --push <app url>.');
+    process.exit(1);
+  }
+  const earlier = (await readFile(resumeFrom, 'utf8'))
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as SiteResult);
+  await push(earlier);
+  process.exit(0);
+}
 
 const sites = (await readFile(listPath, 'utf8'))
   .split('\n')
@@ -126,4 +163,5 @@ await mkdir(dirname(outPath), { recursive: true });
 await writeFile(outPath, results.map((r) => JSON.stringify(r)).join('\n') + '\n');
 
 console.log(summarize(results));
+if (pushTo) await push(results);
 console.log(`\nFull results: ${outPath}`);
