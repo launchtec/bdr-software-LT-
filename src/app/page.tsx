@@ -6,6 +6,12 @@ import { shortlistReason } from '@/lib/shortlist';
 
 export const dynamic = 'force-dynamic';
 
+const SOURCE_LABELS: Record<string, string> = {
+  web_search: 'Top web search results',
+  google_maps: 'Google Maps by trade and area',
+  manual: 'Added by hand',
+};
+
 export default async function OverviewPage() {
   const prospects = await listProspects();
   const audited = prospects.filter((p) => p.audit?.status === 'ok');
@@ -17,6 +23,22 @@ export default async function OverviewPage() {
   );
 
   const shortlist = prospects.filter((p) => shortlistReason(p).shortlisted);
+
+  // How far companies from each source get. This is the table that says which sourcing method earns its keep.
+  const sources = [...new Set(prospects.map((p) => p.company.source))].sort();
+  const funnel = sources.map((source) => {
+    const rows = prospects.filter((p) => p.company.source === source);
+    return {
+      source,
+      sourced: rows.length,
+      audited: rows.filter((p) => p.audit?.status === 'ok').length,
+      advertising: rows.filter((p) => p.googleAds?.status === 'active').length,
+      withGap: rows.filter((p) => advertisingWithGap.includes(p)).length,
+      shortlisted: rows.filter((p) => shortlist.includes(p)).length,
+      goodFit: rows.filter((p) => p.company.fitVerdict === 'good_fit').length,
+      notFit: rows.filter((p) => p.company.fitVerdict && p.company.fitVerdict !== 'good_fit').length,
+    };
+  });
 
   const counts = new Map<string, { usable: number; unconfirmed: number }>();
   for (const p of audited) {
@@ -65,6 +87,46 @@ export default async function OverviewPage() {
           </div>
         </div>
       </div>
+
+      <h2>Funnel by source</h2>
+      <div className="panel">
+        {funnel.length === 0 ? (
+          <div className="empty">No companies yet.</div>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Source</th>
+                <th className="num">Sourced</th>
+                <th className="num">Site audited</th>
+                <th className="num">Running Google ads</th>
+                <th className="num">With tracking gap</th>
+                <th className="num">Shortlisted</th>
+                <th className="num">You: good fit</th>
+                <th className="num">You: not a fit</th>
+              </tr>
+            </thead>
+            <tbody>
+              {funnel.map((row) => (
+                <tr key={row.source}>
+                  <td>{SOURCE_LABELS[row.source] ?? row.source}</td>
+                  <td className="num">{row.sourced}</td>
+                  <td className="num">{row.audited}</td>
+                  <td className="num">{row.advertising}</td>
+                  <td className="num">{row.withGap}</td>
+                  <td className="num">{row.shortlisted}</td>
+                  <td className="num">{row.goodFit}</td>
+                  <td className="num">{row.notFit}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+      <p className="muted small">
+        Each sourcing method gets its own row, so they can be compared on what they produce. Later stages (contacted,
+        replied, calls booked) will extend this table to the right.
+      </p>
 
       <h2>Usable findings</h2>
       <div className="panel">
