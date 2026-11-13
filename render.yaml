@@ -15,6 +15,9 @@ services:
         value: 22
       - key: DATABASE_URL
         sync: false
+      - key: APP_USERNAME
+        value: jacob
+      # Set in the Render dashboard, never in this file.
       - key: APP_PASSWORD
         generateValue: true
       - key: INGEST_TOKEN

@@ -97,6 +97,14 @@ describe('auth', () => {
     expect(checkBasicAuth(basic('jacob', ''), '')).toBe(false);
   });
 
+  it('requires the username when one is configured, ignoring case', () => {
+    expect(checkBasicAuth(basic('jacob', 's3cret'), 's3cret', 'jacob')).toBe(true);
+    expect(checkBasicAuth(basic('Jacob', 's3cret'), 's3cret', 'jacob')).toBe(true);
+    expect(checkBasicAuth(basic('someone', 's3cret'), 's3cret', 'jacob')).toBe(false);
+    expect(checkBasicAuth(basic('', 's3cret'), 's3cret', 'jacob')).toBe(false);
+    expect(checkBasicAuth(basic('jacob', 'wrong'), 's3cret', 'jacob')).toBe(false);
+  });
+
   it('checks bearer tokens', () => {
     expect(checkBearer('Bearer tok-123', 'tok-123')).toBe(true);
     expect(checkBearer('Bearer tok-124', 'tok-123')).toBe(false);

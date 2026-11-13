@@ -62,7 +62,7 @@ A password-protected dashboard over the database: what has been researched, what
 npm run dev
 ```
 
-- Pages ask for a password (HTTP Basic, any username, password from `APP_PASSWORD`). In production the app locks itself if `APP_PASSWORD` is missing.
+- Pages ask for a login (HTTP Basic): username from `APP_USERNAME`, password from `APP_PASSWORD`. If `APP_USERNAME` is unset, any username is accepted. In production the app locks itself if `APP_PASSWORD` is missing.
 - The ingest API requires `Authorization: Bearer <INGEST_TOKEN>`.
 
 ### Hosting (free tier)
@@ -70,7 +70,7 @@ npm run dev
 The app runs on Render's free web service with a free Neon Postgres database. Render's own free database is deleted after 30 days, so it is not used. The free web service sleeps after 15 minutes without traffic; the first page load after that takes up to a minute.
 
 1. Create a project at neon.com and copy its connection string.
-2. In Render, choose New → Blueprint, connect this repository, and paste the connection string as `DATABASE_URL`. `render.yaml` defines the rest and generates `APP_PASSWORD` and `INGEST_TOKEN`; read them on the service's Environment tab.
+2. In Render, choose New → Blueprint, connect this repository, and paste the connection string as `DATABASE_URL`. `render.yaml` defines the rest and generates `APP_PASSWORD` and `INGEST_TOKEN`; read or change them on the service's Environment tab.
 3. Every push to `main` redeploys. Migrations run on start.
 
 ## Setup

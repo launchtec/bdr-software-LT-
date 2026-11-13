@@ -15,7 +15,9 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (checkBasicAuth(request.headers.get('authorization'), password)) return NextResponse.next();
+  if (checkBasicAuth(request.headers.get('authorization'), password, process.env.APP_USERNAME)) {
+    return NextResponse.next();
+  }
 
   return new NextResponse('Authentication required.', {
     status: 401,

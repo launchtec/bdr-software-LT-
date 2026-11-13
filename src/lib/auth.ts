@@ -7,8 +7,12 @@ function sameSecret(given: string, expected: string): boolean {
   return timingSafeEqual(a, b);
 }
 
-/** True when an `Authorization: Basic …` header carries the password. Any username is accepted. */
-export function checkBasicAuth(header: string | null, password: string): boolean {
+/**
+ * True when an `Authorization: Basic …` header carries the password. If a username is
+ * given it must match too (ignoring case, since phones capitalize the first letter);
+ * otherwise any username is accepted.
+ */
+export function checkBasicAuth(header: string | null, password: string, username?: string): boolean {
   if (!password || !header?.startsWith('Basic ')) return false;
   let decoded: string;
   try {
@@ -18,7 +22,9 @@ export function checkBasicAuth(header: string | null, password: string): boolean
   }
   const colon = decoded.indexOf(':');
   if (colon === -1) return false;
-  return sameSecret(decoded.slice(colon + 1), password);
+  const passwordOk = sameSecret(decoded.slice(colon + 1), password);
+  const usernameOk = !username || sameSecret(decoded.slice(0, colon).trim().toLowerCase(), username.trim().toLowerCase());
+  return passwordOk && usernameOk;
 }
 
 /** True when an `Authorization: Bearer …` header carries the token. */
