@@ -133,7 +133,7 @@ export function deriveFindings(d: Detections): Finding[] {
       code: 'ads.no_google_ads_tag',
       confidence: 'likely',
       appliesWhen: 'runs_google_ads',
-      statement: 'No Google Ads tag was detected on the site.',
+      statement: 'No Google Ads tag was detected on the site or configured in its tag containers.',
       caveat: joinCaveats(
         consentCaveat,
         'Conversions can also reach Google Ads through a GA4 import or offline uploads, which a site visit cannot see.',
@@ -142,12 +142,12 @@ export function deriveFindings(d: Detections): Finding[] {
     });
   }
 
-  if (canJudgeAbsence && d.metaPixel.length === 0) {
+  if (canJudgeAbsence && d.metaPixel.length === 0 && !d.metaPixelLibrary) {
     findings.push({
       code: 'ads.no_meta_pixel',
       confidence: 'likely',
       appliesWhen: 'runs_meta_ads',
-      statement: 'No Meta pixel was detected on the site.',
+      statement: 'No Meta pixel was detected on the site or configured in its tag containers.',
       caveat: joinCaveats(consentCaveat, 'Events can also be sent server-side through the Conversions API, which a site visit cannot see.'),
       evidence: [],
     });

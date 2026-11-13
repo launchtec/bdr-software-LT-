@@ -119,6 +119,7 @@ describe('saveAuditSignals', () => {
     html,
     requests: [],
     failedRequests: [],
+    tagScripts: [],
     capturedAt: '2026-01-01T00:00:00.000Z',
   });
 

@@ -8,6 +8,8 @@
 import { chromium, type Browser, type BrowserContext, type LaunchOptions } from 'playwright';
 import type { PageCapture } from './types';
 
+const MAX_TAG_SCRIPT_CHARS = 3_000_000;
+
 const LEAD_PAGE_PATTERN = /contact|quote|estimate|schedul|book|consult|appointment/i;
 
 export interface CollectOptions {
@@ -55,6 +57,20 @@ async function capturePage(context: BrowserContext, url: string, opts: Required<
     const requestUrl = request.url();
     if (requestUrl.startsWith('http')) requests.push(requestUrl);
   });
+  const tagScripts: PageCapture['tagScripts'] = [];
+  const pendingBodies: Promise<void>[] = [];
+  page.on('response', (response) => {
+    const responseUrl = response.url();
+    if (!response.ok() || !/\/(?:gtm\.js|gtag\/js)(?:\?|$)/.test(responseUrl)) return;
+    pendingBodies.push(
+      response
+        .text()
+        .then((body) => {
+          tagScripts.push({ url: responseUrl, body: body.slice(0, MAX_TAG_SCRIPT_CHARS) });
+        })
+        .catch(() => undefined),
+    );
+  });
   page.on('requestfailed', (request) => {
     // Cancelled requests (navigation, beacons cut short) are normal; real failures are not.
     if (request.failure()?.errorText !== 'net::ERR_ABORTED') failedRequests.push(request.url());
@@ -74,6 +90,8 @@ async function capturePage(context: BrowserContext, url: string, opts: Required<
     await page.waitForLoadState('networkidle', { timeout: opts.settleMs * 3 }).catch(() => undefined);
     await page.waitForTimeout(opts.settleMs);
 
+    await Promise.allSettled(pendingBodies);
+
     const capture: PageCapture = {
       url,
       finalUrl: page.url(),
@@ -82,6 +100,7 @@ async function capturePage(context: BrowserContext, url: string, opts: Required<
       html: await page.content(),
       requests,
       failedRequests,
+      tagScripts,
       capturedAt: new Date().toISOString(),
     };
 

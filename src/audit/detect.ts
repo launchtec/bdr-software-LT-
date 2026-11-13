@@ -171,6 +171,7 @@ export function detect(captures: PageCapture[]): Detections {
   const credits = new Map<string, { text: string; knownVendor: string | null }>();
   let platform: VendorHit | null = null;
   let googleCallConversion = false;
+  let metaPixelLibrary = false;
   let tagLoaderFailed = false;
   let formCount = 0;
 
@@ -209,10 +210,15 @@ export function detect(captures: PageCapture[]): Detections {
         /\/pagead\/(?:conversion|viewthroughconversion|1p-conversion|1p-user-list)\/(\d+)/.exec(path);
       if (adsHit) googleAds.add(`AW-${adsHit[1]}`, raw);
 
-      // Meta pixel.
+      // Meta pixel: the event hit, the per-pixel config the library downloads, and the library itself.
       if (hostMatches(host, 'facebook.com') && /^\/tr\/?$/.test(path) && /^\d+$/.test(idParam)) {
         metaPixel.add(idParam, raw);
         if (url.searchParams.get('ev') === 'PageView') bump(metaViews, idParam);
+      }
+      if (hostMatches(host, 'facebook.net')) {
+        const config = /\/signals\/config\/(\d{8,20})/.exec(path);
+        if (config) metaPixel.add(config[1]!, raw);
+        if (path.endsWith('/fbevents.js')) metaPixelLibrary = true;
       }
 
       for (const [bucket, vendors] of Object.entries(HOST_VENDORS) as [keyof typeof HOST_VENDORS, Record<string, string[]>][]) {
@@ -225,6 +231,24 @@ export function detect(captures: PageCapture[]): Detections {
     for (const raw of capture.failedRequests) {
       const path = parseUrl(raw)?.pathname ?? '';
       if (/\/(?:gtm\.js|gtag\/js|fbevents\.js)$/.test(path)) tagLoaderFailed = true;
+    }
+
+    // Tags configured inside a container, whether or not they fired during the visit.
+    for (const script of capture.tagScripts) {
+      const containerId = parseUrl(script.url)?.searchParams.get('id') ?? 'tag script';
+      const where = `configured in ${containerId}`;
+      const body = script.body;
+
+      matchAll(body, /\bAW-(\d{8,12})\b/, (m) => googleAds.add(`AW-${m[1]}`, where));
+      matchAll(body, /"vtp_conversionId":"(\d{8,12})"/, (m) => googleAds.add(`AW-${m[1]}`, where));
+      matchAll(body, /fbq\(\s*\\?["']init\\?["']\s*,\s*\\?["'](\d{8,20})/, (m) => metaPixel.add(m[1]!, where));
+      if (/connect\.facebook\.net/.test(body)) metaPixelLibrary = true;
+      // Only the configured tag counts. The bare parameter name `phone_conversion_number`
+      // is part of every Google tag script, whether or not call conversion is set up.
+      if (/"function":"__awcc"/.test(body)) googleCallConversion = true;
+      for (const [vendor, suffixes] of Object.entries(HOST_VENDORS.callTracking)) {
+        if (suffixes.some((s) => body.includes(s))) vendorMaps.callTracking.add(vendor, where);
+      }
     }
 
     keepMax(ga4MaxPageViews, ga4Views);
@@ -287,6 +311,7 @@ export function detect(captures: PageCapture[]): Detections {
     universalAnalytics: ua.tags(),
     googleAds: googleAds.tags(),
     metaPixel: metaPixel.tags(),
+    metaPixelLibrary,
     ga4MaxPageViews,
     metaMaxPageViews,
     otherAdPixels: vendorMaps.otherAdPixels.vendors(),

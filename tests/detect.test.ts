@@ -12,6 +12,7 @@ function capture(partial: Partial<PageCapture>): PageCapture {
     html: '<html><body></body></html>',
     requests: [],
     failedRequests: [],
+    tagScripts: [],
     capturedAt: '2026-01-01T00:00:00.000Z',
     ...partial,
   };
@@ -55,6 +56,51 @@ describe('detect', () => {
     expect(d.googleTag.map((h) => h.id)).toEqual(['GT-ABCD1234']);
     expect(d.gtm).toEqual([]);
     expect(d.ga4).toEqual([]);
+  });
+
+  it('recognises a Meta pixel from its config download or its library, without a page-view hit', () => {
+    const withConfig = detect([
+      capture({
+        requests: [
+          'https://connect.facebook.net/en_US/fbevents.js',
+          'https://connect.facebook.net/signals/config/914212988268689?v=2.9.439&r=stable',
+        ],
+      }),
+    ]);
+    expect(withConfig.metaPixel.map((h) => h.id)).toEqual(['914212988268689']);
+    expect(withConfig.metaPixelLibrary).toBe(true);
+
+    const libraryOnly = detect([capture({ requests: ['https://connect.facebook.net/en_US/fbevents.js'] })]);
+    expect(libraryOnly.metaPixel).toEqual([]);
+    expect(libraryOnly.metaPixelLibrary).toBe(true);
+  });
+
+  it('reads tags configured inside a Tag Manager container even if they never fired', () => {
+    const body = `var data = {"resource":{"tags":[
+      {"function":"__awct","vtp_conversionId":"123456789","vtp_conversionLabel":"abc"},
+      {"function":"__html","vtp_html":"\\u003Cscript\\u003Efbq(\\'init\\', \\'777888999000111\\');\\u003C/script\\u003E connect.facebook.net/en_US/fbevents.js"},
+      {"function":"__html","vtp_html":"//cdn.callrail.com/companies/1/x/12/swap.js"},
+      {"function":"__googtag","vtp_tagId":"AW-987654321"}]}};`;
+    const d = detect([
+      capture({ tagScripts: [{ url: 'https://www.googletagmanager.com/gtm.js?id=GTM-CONF001', body }] }),
+    ]);
+
+    expect(d.googleAds.map((h) => h.id).sort()).toEqual(['AW-123456789', 'AW-987654321']);
+    expect(d.googleAds[0]?.evidence).toEqual(['configured in GTM-CONF001']);
+    expect(d.metaPixel.map((h) => h.id)).toEqual(['777888999000111']);
+    expect(d.metaPixelLibrary).toBe(true);
+    expect(d.callTracking.map((h) => h.vendor)).toEqual(['CallRail']);
+  });
+
+  it('does not mistake the Google tag library\'s own vocabulary for a configured call conversion', () => {
+    const url = 'https://www.googletagmanager.com/gtm.js?id=GTM-LIB0001';
+    const library = 'var k={ml:"phone_conversion_css_class",No:"phone_conversion_ids",nl:"phone_conversion_number"};';
+
+    const plain = detect([capture({ tagScripts: [{ url, body: library }] })]);
+    expect(plain.googleCallConversion).toBe(false);
+
+    const configured = detect([capture({ tagScripts: [{ url, body: `${library}{"function":"__awcc","vtp_phoneNumber":"7205550100"}` }] })]);
+    expect(configured.googleCallConversion).toBe(true);
   });
 
   it('falls back to tags written in the HTML', () => {

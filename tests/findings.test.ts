@@ -12,6 +12,7 @@ function detections(html: string, requests: string[] = [], failedRequests: strin
     html,
     requests,
     failedRequests,
+    tagScripts: [],
     capturedAt: '2026-01-01T00:00:00.000Z',
   };
   return detect([capture]);
@@ -125,6 +126,11 @@ describe('deriveFindings', () => {
       [GA4, ADS, PIXEL],
     );
     expect(codes(tracked)).not.toContain('calls.no_call_tracking');
+  });
+
+  it('does not report a missing Meta pixel when the pixel library loaded', () => {
+    const d = detections('', [GA4, ADS, 'https://connect.facebook.net/en_US/fbevents.js']);
+    expect(codes(d)).not.toContain('ads.no_meta_pixel');
   });
 
   it('reports several GA4 properties as an observed fact with a caveat', () => {

@@ -32,6 +32,7 @@ const DELAYED = `<!doctype html><html><head><title>Lazy Fence Co</title><script>
 
 /** Stands in for a Tag Manager container that fires GA4 twice and one Meta pixel. */
 const FAKE_GTM = `
+  var container = {"tags":[{"function":"__awct","vtp_conversionId":"123123123"}]};
   fetch('https://www.google-analytics.com/g/collect?v=2&tid=G-FAKEGA4001&en=page_view', { mode: 'no-cors' });
   fetch('https://www.google-analytics.com/g/collect?v=2&tid=G-FAKEGA4001&en=page_view&_s=2', { mode: 'no-cors' });
   fetch('https://www.facebook.com/tr/?id=444444444444&ev=PageView', { mode: 'no-cors' });
@@ -83,12 +84,14 @@ describe('auditSite (real browser, local site)', () => {
     expect(d.gtm.map((h) => h.id)).toEqual(['GTM-FAKE001']);
     expect(d.ga4.map((h) => h.id)).toEqual(['G-FAKEGA4001']);
     expect(d.metaPixel.map((h) => h.id)).toEqual(['444444444444']);
+    // Configured in the container but never fired: still seen.
+    expect(d.googleAds).toEqual([{ id: 'AW-123123123', evidence: ['configured in GTM-FAKE001'] }]);
     expect(d.ga4MaxPageViews).toEqual({ 'G-FAKEGA4001': 2 });
     expect(d.phoneNumbers).toEqual(['7205550100']);
     expect(d.formCount).toBe(1);
 
     expect(audit.findings.map((f) => f.code).sort()).toEqual(
-      ['ads.no_google_ads_tag', 'analytics.double_pageview', 'calls.no_call_tracking', 'vendor.templated_provider'].sort(),
+      ['analytics.double_pageview', 'calls.no_call_tracking', 'vendor.templated_provider'].sort(),
     );
   });
 
@@ -112,6 +115,7 @@ describe('auditSite (real browser, local site)', () => {
       html: '<html></html>',
       requests: [],
       failedRequests: [],
+      tagScripts: [],
       capturedAt: '2026-01-01T00:00:00.000Z',
     };
     expect(() => auditFromCaptures('https://example.com/', [challenge])).toThrow(SiteNotAuditableError);

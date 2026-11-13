@@ -12,6 +12,11 @@ export interface PageCapture {
   requests: string[];
   /** Requests that failed at the network level (cancelled requests excluded). */
   failedRequests: string[];
+  /**
+   * Source of each Tag Manager container or gtag script the page loaded. Containers list
+   * every tag they are configured with, including ones that only fire on a form submit.
+   */
+  tagScripts: { url: string; body: string }[];
   capturedAt: string;
 }
 
@@ -43,6 +48,8 @@ export interface Detections {
   universalAnalytics: TagHit[];
   googleAds: TagHit[];
   metaPixel: TagHit[];
+  /** The Meta pixel library loaded, whether or not a pixel id could be read. */
+  metaPixelLibrary: boolean;
   /** Most GA4 page_view hits seen for one property on a single page load. */
   ga4MaxPageViews: Record<string, number>;
   /** Most Meta PageView hits seen for one pixel on a single page load. */
