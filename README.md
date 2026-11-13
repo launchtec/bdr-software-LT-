@@ -11,7 +11,7 @@ The plan, including channels, sourcing signals, costs and open decisions, is in 
 | System of record (companies, people, identities, signals, sequences, touches, replies, outcomes, experiments, suppression) | `src/db/schema.ts`, `drizzle/` | Schema and first migration |
 | Do-not-contact checks | `src/db/suppression.ts` | Working |
 | Site tracking audit, the first signal collector | `src/audit/` | Working; see limits below |
-| Web app: overview, prospect list, evidence behind each finding | `src/app/` | Working; read-only so far |
+| Web app: overview, prospect list, evidence behind each finding, fit verdicts | `src/app/` | Working |
 | Ingest API, where audit workers push results | `src/app/api/ingest/` | Working |
 | Ad-library check, sourcing, contact finding, drafting, review queue, sending, reply handling | — | Not built yet |
 

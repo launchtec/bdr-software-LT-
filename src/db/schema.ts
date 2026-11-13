@@ -36,6 +36,9 @@ export const companyStatusEnum = pgEnum('company_status', [
   'client',
 ]);
 
+/** A person's judgment of whether a company is worth pursuing; the fit score is calibrated against these. */
+export const fitVerdictEnum = pgEnum('fit_verdict', ['good_fit', 'too_big', 'too_small', 'wrong_type']);
+
 export const roleTypeEnum = pgEnum('role_type', ['owner', 'marketing_lead', 'executive', 'other']);
 
 export const verificationEnum = pgEnum('verification', ['unverified', 'valid', 'risky', 'invalid']);
@@ -120,6 +123,9 @@ export const companies = pgTable(
     /** `A` = full cross-channel sequence, `B` = email only. */
     tier: text('tier'),
     status: companyStatusEnum('status').notNull().default('new'),
+    fitVerdict: fitVerdictEnum('fit_verdict'),
+    fitNote: text('fit_note'),
+    fitMarkedAt: timestamp('fit_marked_at', { withTimezone: true }),
     notes: text('notes'),
     createdAt: createdAt(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

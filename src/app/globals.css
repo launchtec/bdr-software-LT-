@@ -176,6 +176,62 @@ a.chip.active {
   color: #fff;
 }
 
+.filters {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 10px 12px;
+  align-items: start;
+  margin-bottom: 16px;
+}
+.filter-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding-top: 3px;
+}
+
+.fit {
+  display: grid;
+  gap: 8px;
+}
+.fit-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.fit input[type='text'] {
+  font: inherit;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  max-width: 520px;
+}
+.fitbtn {
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.fitbtn:hover {
+  border-color: var(--text-secondary);
+  color: var(--text);
+}
+.fitbtn.on {
+  background: var(--text);
+  border-color: var(--text);
+  color: #fff;
+  font-weight: 600;
+}
+.fitbtn.clear {
+  border-style: dashed;
+  color: var(--text-muted);
+}
+
 .barlist {
   display: grid;
   grid-template-columns: minmax(180px, 260px) 1fr 44px;
@@ -332,6 +388,9 @@ dl.facts > :nth-last-child(-n + 2) {
   }
   .stages li .what {
     display: none;
+  }
+  .filters {
+    grid-template-columns: 1fr;
   }
   .panel {
     overflow-x: auto;

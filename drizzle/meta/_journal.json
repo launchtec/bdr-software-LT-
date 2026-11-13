@@ -15,6 +15,13 @@
       "when": 1794600087810,
       "tag": "0001_site_audits",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794602520152,
+      "tag": "0002_fit_verdict",
+      "breakpoints": true
     }
   ]
 }

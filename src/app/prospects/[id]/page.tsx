@@ -1,8 +1,11 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { appliesWhenLabel, findingLabel } from '@/audit/labels';
+import { MATURITY_LABELS, stackMaturity } from '@/audit/maturity';
 import type { Detections } from '@/audit/types';
+import { isFitVerdict } from '@/db/fit';
 import { getProspect } from '@/lib/queries';
+import { FitButtons } from '../fit-buttons';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,6 +49,22 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
         {audit?.pageTitle ? <> · {audit.pageTitle}</> : null}
         {audit ? <> · audited {audit.auditedAt.toISOString().slice(0, 10)}</> : null}
       </p>
+
+      <h2>Your call</h2>
+      <div className="panel" style={{ padding: '14px 18px' }}>
+        <FitButtons
+          companyId={company.id}
+          current={isFitVerdict(company.fitVerdict) ? company.fitVerdict : null}
+          note={company.fitNote}
+          withNote
+        />
+        {audit?.status === 'ok' && audit.detections ? (
+          <p className="muted small" style={{ margin: '10px 0 0' }}>
+            Setup: <strong>{MATURITY_LABELS[stackMaturity(audit.detections)].label}</strong>.{' '}
+            {MATURITY_LABELS[stackMaturity(audit.detections)].meaning}
+          </p>
+        ) : null}
+      </div>
 
       {audit?.status === 'not_auditable' ? (
         <div className="notice">
