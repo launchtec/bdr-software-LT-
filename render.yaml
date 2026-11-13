@@ -5,6 +5,8 @@ services:
     name: launchtec-bdr
     runtime: node
     plan: free
+    # Same region as the Neon database (AWS US East 2, Ohio).
+    region: ohio
     buildCommand: npm ci --include=dev && npm run build
     startCommand: npm run db:migrate && npm run start
     healthCheckPath: /api/health
