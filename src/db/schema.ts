@@ -24,7 +24,7 @@ import type { Detections } from '../audit/types';
 const id = () => uuid('id').primaryKey().defaultRandom();
 const createdAt = () => timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
 
-export const channelEnum = pgEnum('channel', ['email', 'linkedin', 'instagram', 'direct_mail', 'phone']);
+export const channelEnum = pgEnum('channel', ['email', 'linkedin', 'instagram', 'direct_mail', 'phone', 'facebook']);
 
 export const companyStatusEnum = pgEnum('company_status', [
   'new',
@@ -126,6 +126,9 @@ export const companies = pgTable(
     fitVerdict: fitVerdictEnum('fit_verdict'),
     fitNote: text('fit_note'),
     fitMarkedAt: timestamp('fit_marked_at', { withTimezone: true }),
+    /** The research dossier: who they are, who decides, size clues, red flags, hooks, sources. */
+    research: jsonb('research').$type<Record<string, unknown>>(),
+    researchedAt: timestamp('researched_at', { withTimezone: true }),
     notes: text('notes'),
     createdAt: createdAt(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -147,6 +150,9 @@ export const people = pgTable(
     roleType: roleTypeEnum('role_type').notNull().default('other'),
     /** Where the name came from (company site, license record, state filing, LinkedIn...). */
     source: text('source').notNull(),
+    /** `high` when the company's own site or an official record names them; lower otherwise. */
+    confidence: text('confidence'),
+    sourceUrl: text('source_url'),
     createdAt: createdAt(),
   },
   (t) => [index('people_company_idx').on(t.companyId)],

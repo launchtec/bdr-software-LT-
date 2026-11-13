@@ -4,12 +4,35 @@ import { conditionLabel, findingLabel } from '@/audit/labels';
 import { MATURITY_LABELS, stackMaturity } from '@/audit/maturity';
 import type { Detections } from '@/audit/types';
 import { isFitVerdict } from '@/db/fit';
+import { getOutreachForCompany, getPeople } from '@/lib/outreach-queries';
 import { findingState, getProspect } from '@/lib/queries';
+import { MessageCard } from '../../outreach/message-card';
 import { FitButtons } from '../fit-buttons';
 
 export const dynamic = 'force-dynamic';
 
 const join = (values: string[]) => (values.length ? values.join(', ') : '—');
+
+interface Research {
+  whatTheyDo?: unknown;
+  sizeClues?: unknown;
+  redFlags?: unknown;
+  hooks?: ({ fact?: string } | string)[];
+  whoRunsTheirAds?: unknown;
+  researchNotes?: unknown;
+}
+
+const text = (value: unknown): string | null => (typeof value === 'string' && value.trim() ? value : null);
+
+function ResearchList({ label, items }: { label: string; items: unknown }) {
+  const list = Array.isArray(items) ? items.filter((i): i is string => typeof i === 'string' && i.trim().length > 0) : [];
+  if (list.length === 0) return null;
+  return (
+    <p className="small" style={{ margin: '0 0 6px' }}>
+      <strong>{label}:</strong> {list.join(' · ')}
+    </p>
+  );
+}
 
 const NETWORK_NAMES: Record<string, string> = {
   facebook: 'Facebook',
@@ -44,6 +67,8 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
   const { company, audit, signals, googleAds } = prospect;
   const applicable = signals.filter((s) => findingState(s, googleAds) !== 'not_applicable');
   const ruledOut = signals.filter((s) => findingState(s, googleAds) === 'not_applicable');
+  const [contacts, outreach] = await Promise.all([getPeople(company.id), getOutreachForCompany(company.id)]);
+  const research = company.research as Research | null;
 
   return (
     <>
@@ -79,6 +104,49 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
           </p>
         ) : null}
       </div>
+
+      {research || contacts.length > 0 ? (
+        <>
+          <h2>Research</h2>
+          <div className="panel" style={{ padding: '14px 18px' }}>
+            {contacts.map(({ person, identities }) => (
+              <p key={person.id} style={{ margin: '0 0 8px' }}>
+                <strong>{person.fullName}</strong>
+                {person.title ? `, ${person.title}` : ''}
+                {person.confidence ? <span className="muted small"> · name confidence: {person.confidence}</span> : null}
+                {person.sourceUrl ? (
+                  <>
+                    {' '}
+                    <a className="small" href={person.sourceUrl} target="_blank" rel="noreferrer noopener">
+                      source ↗
+                    </a>
+                  </>
+                ) : null}
+                {identities.length > 0 ? (
+                  <span className="muted small"> · {identities.map((i) => (i.channel === 'email' ? i.value : i.channel)).join(', ')}</span>
+                ) : null}
+              </p>
+            ))}
+            {research ? (
+              <>
+                {text(research.whatTheyDo) ? <p style={{ margin: '0 0 8px' }}>{text(research.whatTheyDo)}</p> : null}
+                <ResearchList label="Size clues" items={research.sizeClues} />
+                <ResearchList label="Red flags" items={research.redFlags} />
+                <ResearchList label="Hooks" items={(research.hooks ?? []).map((h) => (typeof h === 'string' ? h : h?.fact))} />
+                {text(research.whoRunsTheirAds) ? <p className="small" style={{ margin: '0 0 6px' }}>Who runs their ads: {text(research.whoRunsTheirAds)}</p> : null}
+                {text(research.researchNotes) ? <p className="muted small" style={{ margin: 0 }}>{text(research.researchNotes)}</p> : null}
+              </>
+            ) : null}
+          </div>
+        </>
+      ) : null}
+
+      {outreach.length > 0 ? (
+        <>
+          <h2>Messages</h2>
+          {outreach.flatMap((c) => c.messages.map((m) => <MessageCard key={m.touch.id} message={m} />))}
+        </>
+      ) : null}
 
       <h2>Google ads</h2>
       <div className="panel" style={{ padding: '14px 18px' }}>

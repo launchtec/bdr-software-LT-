@@ -17,7 +17,9 @@ The plan, including channels, sourcing signals, costs and open decisions, is in 
 | Meta ad check | — | Not built: Meta's Ad Library blocks automated visits |
 | Sourcing from Google Maps searches by trade and area | `src/sourcing/` | Working; no size signal yet |
 | Shortlist rule: advertising now, confirmed tracking gap, setup not built out | `src/lib/shortlist.ts` | Working; to be tuned against fit verdicts |
-| Contact finding, drafting, review queue, sending, reply handling | — | Not built yet |
+| Outreach queue: research dossier, contact, drafted messages per channel; edit, approve, copy, mark sent, log reply | `src/app/outreach/`, `src/db/outreach.ts` | Working; sending is by hand |
+| Contact research and message drafting | — | Done by a researcher (human or AI session) and pushed in through `POST /api/ingest/outreach`; not automated inside the app |
+| Automatic email sending and reply reading | — | Not built yet |
 
 ## Site audit
 
