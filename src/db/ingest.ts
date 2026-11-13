@@ -183,3 +183,79 @@ export async function ingestAdCheck(db: Db, input: AdCheckIngest): Promise<boole
   });
   return true;
 }
+
+export interface CompanyIngest {
+  name: string;
+  websiteUrl: string;
+  segment?: string;
+  city?: string;
+  region?: string;
+  source: string;
+  /** Source-specific details, e.g. a Maps listing's category, rating, phone and address. */
+  sourceRef?: Record<string, unknown>;
+}
+
+/** Checks the shape of one sourced company from an untrusted request body. */
+export function parseCompanyIngest(raw: unknown): CompanyIngest {
+  if (typeof raw !== 'object' || raw === null) throw new InvalidIngestError('Each item must be an object.');
+  const item = raw as Record<string, unknown>;
+  if (!isString(item.name) || !isString(item.websiteUrl) || !isString(item.source)) {
+    throw new InvalidIngestError('Each company needs a name, a websiteUrl and a source.');
+  }
+  if (!/^https?:\/\//.test(item.websiteUrl) || !normalizeDomain(item.websiteUrl).includes('.')) {
+    throw new InvalidIngestError(`Not a site URL: ${item.websiteUrl}`);
+  }
+  const ref = item.sourceRef;
+  if (ref !== undefined && (typeof ref !== 'object' || ref === null || Array.isArray(ref))) {
+    throw new InvalidIngestError(`sourceRef for ${item.name} must be an object.`);
+  }
+  return {
+    name: item.name.slice(0, 200),
+    websiteUrl: item.websiteUrl,
+    segment: isString(item.segment) ? item.segment : undefined,
+    city: isString(item.city) ? item.city : undefined,
+    region: isString(item.region) ? item.region : undefined,
+    source: item.source,
+    sourceRef: ref as Record<string, unknown> | undefined,
+  };
+}
+
+/**
+ * Adds a sourced company, or fills in what was missing on one we already have (a real
+ * name in place of the bare domain, a city, the source details). Never overwrites a
+ * source or name that was already set. Returns whether the company is new.
+ */
+export async function ingestCompany(db: Db, input: CompanyIngest): Promise<{ id: string; created: boolean }> {
+  const domain = normalizeDomain(input.websiteUrl);
+  const existing = (await db.select().from(companies).where(eq(companies.domain, domain)).limit(1))[0];
+
+  if (!existing) {
+    const [created] = await db
+      .insert(companies)
+      .values({
+        name: input.name,
+        domain,
+        websiteUrl: input.websiteUrl,
+        segment: input.segment,
+        city: input.city,
+        region: input.region,
+        source: input.source,
+        sourceRef: input.sourceRef,
+      })
+      .returning({ id: companies.id });
+    return { id: created!.id, created: true };
+  }
+
+  await db
+    .update(companies)
+    .set({
+      name: existing.name === existing.domain ? input.name : existing.name,
+      segment: existing.segment ?? input.segment,
+      city: existing.city ?? input.city,
+      region: existing.region ?? input.region,
+      sourceRef: { ...(input.sourceRef ?? {}), ...(existing.sourceRef ?? {}) },
+      updatedAt: new Date(),
+    })
+    .where(eq(companies.id, existing.id));
+  return { id: existing.id, created: false };
+}

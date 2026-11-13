@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { findingLabel } from '@/audit/labels';
 import { PIPELINE, STATE_LABEL } from '@/lib/pipeline';
 import { findingState, isConditional, listProspects } from '@/lib/queries';
+import { shortlistReason } from '@/lib/shortlist';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +15,8 @@ export default async function OverviewPage() {
   const advertisingWithGap = advertising.filter((p) =>
     p.signals.some((s) => isConditional(s) && findingState(s, p.googleAds) === 'usable'),
   );
+
+  const shortlist = prospects.filter((p) => shortlistReason(p).shortlisted);
 
   const counts = new Map<string, { usable: number; unconfirmed: number }>();
   for (const p of audited) {
@@ -53,9 +56,13 @@ export default async function OverviewPage() {
           <div className="note">of {adChecked.length} checked, shown in the last 30 days</div>
         </div>
         <div className="tile">
-          <div className="label">Advertising with a tracking gap</div>
-          <div className="value">{advertisingWithGap.length}</div>
-          <div className="note">paying for ads, with a gap in measuring them</div>
+          <div className="label">
+            <Link href="/prospects?view=shortlist">Shortlist</Link>
+          </div>
+          <div className="value">{shortlist.length}</div>
+          <div className="note">
+            of {advertisingWithGap.length} advertising with a tracking gap, minus built-out setups and large advertisers
+          </div>
         </div>
       </div>
 

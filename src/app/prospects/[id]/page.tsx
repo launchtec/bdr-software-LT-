@@ -48,6 +48,9 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
             {company.websiteUrl}
           </a>
         ) : null}
+        {typeof company.sourceRef?.category === 'string' ? <> · {company.sourceRef.category}</> : null}
+        {typeof company.sourceRef?.place === 'string' ? <> · found near {company.sourceRef.place}</> : null}
+        {typeof company.sourceRef?.phone === 'string' ? <> · {company.sourceRef.phone}</> : null}
         {audit?.pageTitle ? <> · {audit.pageTitle}</> : null}
         {audit ? <> · audited {audit.auditedAt.toISOString().slice(0, 10)}</> : null}
       </p>

@@ -15,7 +15,9 @@ The plan, including channels, sourcing signals, costs and open decisions, is in 
 | Ingest API, where audit workers push results | `src/app/api/ingest/` | Working |
 | Google ad check: who is running ads, from Google's public ad library | `src/adcheck/` | Working |
 | Meta ad check | — | Not built: Meta's Ad Library blocks automated visits |
-| Sourcing, contact finding, drafting, review queue, sending, reply handling | — | Not built yet |
+| Sourcing from Google Maps searches by trade and area | `src/sourcing/` | Working; no size signal yet |
+| Shortlist rule: advertising now, confirmed tracking gap, setup not built out | `src/lib/shortlist.ts` | Working; to be tuned against fit verdicts |
+| Contact finding, drafting, review queue, sending, reply handling | — | Not built yet |
 
 ## Site audit
 
@@ -55,6 +57,18 @@ Known limits:
 - Findings marked `appliesWhen` only count once the ad check confirms the company advertises. Findings that depend on Meta ads stay unconfirmed.
 - Sites behind a Cloudflare bot challenge cannot be audited: 4 of 33 in the first real-site run (Colorado home-services companies, 2026-11-13).
 - The vendor fingerprint lists in `src/audit/detect.ts` are a starting set, extended as real sites reveal new ones.
+
+## Sourcing
+
+Runs Google Maps searches for each trade and place, removes duplicates, and keeps businesses that have their own website.
+
+```bash
+npm run source:maps -- --trades "fence company,roofing contractor" --places "Arvada CO,Aurora CO" --out audit-output/maps.jsonl --sites audit-output/sites.txt
+```
+
+- Maps lists small and mid-sized local companies that web search rankings bury.
+- Logged-out Maps hides review counts, so there is no size signal yet. Google's official Places API returns them and is the intended replacement for this scraper, which reads a public page and could be blocked.
+- Sourced companies are pushed to `POST /api/ingest/companies`; the site list then goes through `audit:batch` and `adcheck`.
 
 ## Ad check
 

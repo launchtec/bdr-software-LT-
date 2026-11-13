@@ -120,7 +120,8 @@ AI research and drafting cost is usage-based and not yet priced. Prices came fro
 ## Working assumptions
 
 - First segment: home-services companies already running Google Ads. Second: ecommerce brands on Meta.
-- Size: roughly $400K to $3M in revenue. The largest, most visible companies are out: they already have agencies and are pitched constantly.
+- Size: roughly $400K to $3M in revenue; smaller companies have closed before. Above about $5M they usually have in-house marketing or an agency. Worth testing as a separate experiment: larger companies where the research can prove the current work is poor.
+- Method: modelled on a BDR who researched each company by hand, judged the fit, found the gap and wrote a personal message. The software does the digging and shortlisting; a person makes the call and owns the message.
 - Offer: $1,600 a month per channel, plus a one-time $1,000 setup per channel when ad spend is under $10K a month.
 - First goal: two good discovery calls. Quality of the list and message matters more than volume.
 - US only.

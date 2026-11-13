@@ -4,6 +4,7 @@ import { MATURITY_LABELS, stackMaturity } from '@/audit/maturity';
 import type { Detections } from '@/audit/types';
 import { FIT_LABELS, isFitVerdict } from '@/db/fit';
 import { findingState, listProspects, type AdCheckRow, type Prospect } from '@/lib/queries';
+import { shortlistReason } from '@/lib/shortlist';
 import { FitButtons } from './fit-buttons';
 
 export const dynamic = 'force-dynamic';
@@ -22,8 +23,9 @@ const ADS_LABELS: Record<string, string> = { active: 'Active', lapsed: 'Lapsed',
 
 const adsKey = (ads: AdCheckRow | null) => ads?.status ?? 'unchecked';
 
-function href(params: { finding?: string; fit?: string; ads?: string }): string {
+function href(params: { finding?: string; fit?: string; ads?: string; view?: string }): string {
   const query = new URLSearchParams();
+  if (params.view) query.set('view', params.view);
   if (params.finding) query.set('finding', params.finding);
   if (params.fit) query.set('fit', params.fit);
   if (params.ads) query.set('ads', params.ads);
@@ -34,10 +36,13 @@ function href(params: { finding?: string; fit?: string; ads?: string }): string 
 export default async function ProspectsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ finding?: string; fit?: string; ads?: string }>;
+  searchParams: Promise<{ finding?: string; fit?: string; ads?: string; view?: string }>;
 }) {
-  const { finding, fit, ads } = await searchParams;
-  const all = await listProspects();
+  const { finding, fit, ads, view } = await searchParams;
+  const loaded = await listProspects();
+  const shortlisted = new Set(loaded.filter((p) => shortlistReason(p).shortlisted).map((p) => p.company.id));
+  // Shortlisted companies first, then alphabetical (the order they were loaded in).
+  const all = [...loaded].sort((a, b) => Number(shortlisted.has(b.company.id)) - Number(shortlisted.has(a.company.id)));
 
   const codes = [...new Set(all.flatMap((p) => p.signals.map((s) => s.code)))].sort((a, b) =>
     findingLabel(a).localeCompare(findingLabel(b)),
@@ -49,7 +54,8 @@ export default async function ProspectsPage({
   const matchesFinding = (p: Prospect) =>
     !finding || p.signals.some((s) => s.code === finding && findingState(s, p.googleAds) !== 'not_applicable');
   const matchesAds = (p: Prospect) => !ads || adsKey(p.googleAds) === ads;
-  const shown = all.filter((p) => matchesFit(p) && matchesFinding(p) && matchesAds(p));
+  const matchesView = (p: Prospect) => view !== 'shortlist' || shortlisted.has(p.company.id);
+  const shown = all.filter((p) => matchesView(p) && matchesFit(p) && matchesFinding(p) && matchesAds(p));
 
   const fitOptions = [
     { key: 'unreviewed', label: 'Not reviewed', count: all.filter((p) => p.company.fitVerdict === null).length },
@@ -69,15 +75,24 @@ export default async function ProspectsPage({
       </p>
 
       <div className="filters">
+        <span className="filter-label">View</span>
+        <div className="chips">
+          <Link href={href({ finding, fit, ads, view: 'shortlist' })} className={`chip ${view === 'shortlist' ? 'active' : ''}`}>
+            Shortlist ({shortlisted.size})
+          </Link>
+          <Link href={href({ finding, fit, ads })} className={`chip ${view === 'shortlist' ? '' : 'active'}`}>
+            Everything ({all.length})
+          </Link>
+        </div>
         <span className="filter-label">Your call</span>
         <div className="chips">
-          <Link href={href({ finding, ads })} className={`chip ${fit ? '' : 'active'}`}>
+          <Link href={href({ view, finding, ads })} className={`chip ${fit ? '' : 'active'}`}>
             All ({all.length})
           </Link>
           {fitOptions.map((option) => (
             <Link
               key={option.key}
-              href={href({ finding, ads, fit: option.key })}
+              href={href({ view, finding, ads, fit: option.key })}
               className={`chip ${fit === option.key ? 'active' : ''}`}
             >
               {option.label} ({option.count})
@@ -86,11 +101,11 @@ export default async function ProspectsPage({
         </div>
         <span className="filter-label">Google ads</span>
         <div className="chips">
-          <Link href={href({ finding, fit })} className={`chip ${ads ? '' : 'active'}`}>
+          <Link href={href({ view, finding, fit })} className={`chip ${ads ? '' : 'active'}`}>
             Any
           </Link>
           {Object.entries(ADS_LABELS).map(([key, label]) => (
-            <Link key={key} href={href({ finding, fit, ads: key })} className={`chip ${ads === key ? 'active' : ''}`}>
+            <Link key={key} href={href({ view, finding, fit, ads: key })} className={`chip ${ads === key ? 'active' : ''}`}>
               {label} ({all.filter((p) => adsKey(p.googleAds) === key).length})
             </Link>
           ))}
@@ -99,11 +114,11 @@ export default async function ProspectsPage({
           <>
             <span className="filter-label">Finding</span>
             <div className="chips">
-              <Link href={href({ fit, ads })} className={`chip ${finding ? '' : 'active'}`}>
+              <Link href={href({ view, fit, ads })} className={`chip ${finding ? '' : 'active'}`}>
                 Any
               </Link>
               {codes.map((code) => (
-                <Link key={code} href={href({ fit, ads, finding: code })} className={`chip ${finding === code ? 'active' : ''}`}>
+                <Link key={code} href={href({ view, fit, ads, finding: code })} className={`chip ${finding === code ? 'active' : ''}`}>
                   {findingLabel(code)}
                 </Link>
               ))}
@@ -131,21 +146,27 @@ export default async function ProspectsPage({
             </thead>
             <tbody>
               {shown.map((p) => (
-                <Row key={p.company.id} prospect={p} />
+                <Row key={p.company.id} prospect={p} shortlisted={shortlisted.has(p.company.id)} />
               ))}
             </tbody>
           </table>
         )}
       </div>
       <p className="muted small">
-        Setup is a rough read of how built-out the site&apos;s tracking is. “Built out” usually means an agency is
+        The shortlist is companies running Google ads now, with a confirmed gap in tracking them, whose setup is not
+        already built out and whose ad operation is not large. Setup is a rough read of how built-out the site&apos;s tracking is. “Built out” usually means an agency is
         already in place.
       </p>
     </>
   );
 }
 
-function Row({ prospect }: { prospect: Prospect }) {
+function sourceText(ref: Record<string, unknown> | null, key: string): string | null {
+  const value = ref?.[key];
+  return typeof value === 'string' && value ? value : null;
+}
+
+function Row({ prospect, shortlisted }: { prospect: Prospect; shortlisted: boolean }) {
   const { company, audit, signals, googleAds } = prospect;
   const usable = signals.filter((s) => findingState(s, googleAds) === 'usable');
   const unconfirmed = signals.filter((s) => findingState(s, googleAds) === 'unconfirmed').length;
@@ -158,7 +179,12 @@ function Row({ prospect }: { prospect: Prospect }) {
         <Link href={`/prospects/${company.id}`}>
           <strong>{company.name}</strong>
         </Link>
-        {audit?.pageTitle ? <div className="muted small">{audit.pageTitle.slice(0, 70)}</div> : null}
+        {shortlisted ? <span className="chip strong" style={{ marginLeft: 8 }}>Shortlist</span> : null}
+        <div className="muted small">
+          {[company.name === company.domain ? null : company.domain, sourceText(company.sourceRef, 'category'), sourceText(company.sourceRef, 'place')]
+            .filter(Boolean)
+            .join(' · ') || audit?.pageTitle?.slice(0, 70)}
+        </div>
       </td>
       <td>
         {detections ? (
