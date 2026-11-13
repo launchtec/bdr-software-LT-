@@ -5,7 +5,7 @@
 import { eq } from 'drizzle-orm';
 import { saveAuditSignals } from '../audit/persist';
 import type { SiteAudit } from '../audit/types';
-import { companies, siteAudits } from './schema';
+import { adChecks, companies, siteAudits } from './schema';
 import { normalizeDomain, type Db } from './suppression';
 
 export interface AuditIngest {
@@ -122,4 +122,64 @@ export async function ingestAudit(db: Db, input: AuditIngest): Promise<string> {
   }
 
   return companyId;
+}
+
+export interface AdCheckIngest {
+  domain: string;
+  platform: 'google';
+  status: 'active' | 'lapsed' | 'none';
+  adCount: number;
+  advertisers: { id: string; name: string }[];
+  formats?: Record<string, number>;
+  firstShown: string | null;
+  lastShown: string | null;
+  sourceUrl: string;
+  checkedAt: string;
+}
+
+const isDateOrNull = (v: unknown) => v === null || (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v));
+
+/** Checks the shape of one ad check from an untrusted request body. */
+export function parseAdCheckIngest(raw: unknown): AdCheckIngest {
+  if (typeof raw !== 'object' || raw === null) throw new InvalidIngestError('Each item must be an object.');
+  const item = raw as Record<string, unknown>;
+  const ok =
+    isString(item.domain) &&
+    normalizeDomain(item.domain).includes('.') &&
+    item.platform === 'google' &&
+    (item.status === 'active' || item.status === 'lapsed' || item.status === 'none') &&
+    typeof item.adCount === 'number' &&
+    Number.isInteger(item.adCount) &&
+    item.adCount >= 0 &&
+    Array.isArray(item.advertisers) &&
+    item.advertisers.every((a) => isString(a?.id) && isString(a?.name)) &&
+    isDateOrNull(item.firstShown) &&
+    isDateOrNull(item.lastShown) &&
+    isString(item.sourceUrl) &&
+    /^https:\/\//.test(item.sourceUrl) &&
+    isString(item.checkedAt) &&
+    !Number.isNaN(Date.parse(item.checkedAt));
+  if (!ok) throw new InvalidIngestError(`Malformed ad check for ${String(item.domain)}.`);
+  return item as unknown as AdCheckIngest;
+}
+
+/** Records an ad check against the company with this domain. Returns false if there is no such company. */
+export async function ingestAdCheck(db: Db, input: AdCheckIngest): Promise<boolean> {
+  const domain = normalizeDomain(input.domain);
+  const company = (await db.select({ id: companies.id }).from(companies).where(eq(companies.domain, domain)).limit(1))[0];
+  if (!company) return false;
+
+  await db.insert(adChecks).values({
+    companyId: company.id,
+    platform: input.platform,
+    status: input.status,
+    adCount: input.adCount,
+    advertisers: input.advertisers,
+    formats: input.formats,
+    firstShown: input.firstShown,
+    lastShown: input.lastShown,
+    sourceUrl: input.sourceUrl,
+    checkedAt: new Date(input.checkedAt),
+  });
+  return true;
 }

@@ -13,7 +13,9 @@ The plan, including channels, sourcing signals, costs and open decisions, is in 
 | Site tracking audit, the first signal collector | `src/audit/` | Working; see limits below |
 | Web app: overview, prospect list, evidence behind each finding, fit verdicts | `src/app/` | Working |
 | Ingest API, where audit workers push results | `src/app/api/ingest/` | Working |
-| Ad-library check, sourcing, contact finding, drafting, review queue, sending, reply handling | — | Not built yet |
+| Google ad check: who is running ads, from Google's public ad library | `src/adcheck/` | Working |
+| Meta ad check | — | Not built: Meta's Ad Library blocks automated visits |
+| Sourcing, contact finding, drafting, review queue, sending, reply handling | — | Not built yet |
 
 ## Site audit
 
@@ -50,9 +52,27 @@ How it stays honest:
 Known limits:
 
 - It reads the Tag Manager container, so it sees tags that only fire on a form submit, but it cannot tell whether they fire correctly, and it cannot see conversions imported from GA4 or uploaded offline.
-- Findings marked `appliesWhen` mean nothing until an ad-library check confirms the company advertises; that check is not built yet.
+- Findings marked `appliesWhen` only count once the ad check confirms the company advertises. Findings that depend on Meta ads stay unconfirmed.
 - Sites behind a Cloudflare bot challenge cannot be audited: 4 of 33 in the first real-site run (Colorado home-services companies, 2026-11-13).
 - The vendor fingerprint lists in `src/audit/detect.ts` are a starting set, extended as real sites reveal new ones.
+
+## Ad check
+
+Reads Google's public Ads Transparency Center to see whether ads point at a company's domain, how many, and when they were first and last shown. A company counts as active if an ad was shown in the last 30 days.
+
+```bash
+npm run adcheck -- example.com
+```
+
+```bash
+npm run adcheck -- --list sites.txt --push https://your-app.example.com
+```
+
+- The result decides which audit findings can be used: "no Google Ads tag" only matters for a company that is running Google ads.
+- If the library cannot be read, the company is reported as not checked, never as "no ads".
+- Ads that point to a different domain (a separate landing-page domain, for example) do not appear, and the advertiser name is often the agency running the account.
+- It reads a public web page, not an API, one company at a time. Google could change or block it.
+- Behind an HTTP proxy, set `NODE_USE_ENV_PROXY=1` so `--push` goes through it.
 
 ## Web app
 

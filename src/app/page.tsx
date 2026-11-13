@@ -1,26 +1,32 @@
 import Link from 'next/link';
 import { findingLabel } from '@/audit/labels';
 import { PIPELINE, STATE_LABEL } from '@/lib/pipeline';
-import { isConditional, listProspects } from '@/lib/queries';
+import { findingState, isConditional, listProspects } from '@/lib/queries';
 
 export const dynamic = 'force-dynamic';
 
 export default async function OverviewPage() {
   const prospects = await listProspects();
   const audited = prospects.filter((p) => p.audit?.status === 'ok');
-  const blocked = prospects.filter((p) => p.audit?.status === 'not_auditable');
-  const withUsable = audited.filter((p) => p.signals.some((s) => !isConditional(s)));
+  const adChecked = prospects.filter((p) => p.googleAds);
+  const advertising = prospects.filter((p) => p.googleAds?.status === 'active');
+  // The strongest openers: confirmed to be paying for ads, with a gap that only matters because they are.
+  const advertisingWithGap = advertising.filter((p) =>
+    p.signals.some((s) => isConditional(s) && findingState(s, p.googleAds) === 'usable'),
+  );
 
-  const counts = new Map<string, { sites: number; conditional: boolean }>();
+  const counts = new Map<string, { usable: number; unconfirmed: number }>();
   for (const p of audited) {
     for (const s of p.signals) {
-      const entry = counts.get(s.code) ?? { sites: 0, conditional: isConditional(s) };
-      entry.sites += 1;
+      const state = findingState(s, p.googleAds);
+      if (state === 'not_applicable') continue;
+      const entry = counts.get(s.code) ?? { usable: 0, unconfirmed: 0 };
+      entry[state] += 1;
       counts.set(s.code, entry);
     }
   }
-  const ranked = [...counts].sort((a, b) => b[1].sites - a[1].sites);
-  const max = Math.max(1, ...ranked.map(([, c]) => c.sites));
+  const ranked = [...counts].sort((a, b) => b[1].usable - a[1].usable || b[1].unconfirmed - a[1].unconfirmed);
+  const max = Math.max(1, ...ranked.map(([, c]) => c.usable));
 
   return (
     <>
@@ -39,35 +45,35 @@ export default async function OverviewPage() {
         <div className="tile">
           <div className="label">Sites audited</div>
           <div className="value">{audited.length}</div>
-          <div className="note">tracking setup read successfully</div>
+          <div className="note">{prospects.length - audited.length} could not be read</div>
         </div>
         <div className="tile">
-          <div className="label">With a usable finding</div>
-          <div className="value">{withUsable.length}</div>
-          <div className="note">true whether or not they advertise</div>
+          <div className="label">Running Google ads</div>
+          <div className="value">{advertising.length}</div>
+          <div className="note">of {adChecked.length} checked, shown in the last 30 days</div>
         </div>
         <div className="tile">
-          <div className="label">Could not audit</div>
-          <div className="value">{blocked.length}</div>
-          <div className="note">site blocked the visit</div>
+          <div className="label">Advertising with a tracking gap</div>
+          <div className="value">{advertisingWithGap.length}</div>
+          <div className="note">paying for ads, with a gap in measuring them</div>
         </div>
       </div>
 
-      <h2>Findings across audited sites</h2>
+      <h2>Usable findings</h2>
       <div className="panel">
         {ranked.length === 0 ? (
           <div className="empty">No audits have been loaded yet.</div>
         ) : (
           <div className="barlist">
             {ranked.map(([code, c]) => (
-              <FindingRow key={code} code={code} sites={c.sites} conditional={c.conditional} max={max} total={audited.length} />
+              <FindingRow key={code} code={code} usable={c.usable} unconfirmed={c.unconfirmed} max={max} total={audited.length} />
             ))}
           </div>
         )}
       </div>
       <p className="muted small">
-        Findings marked “if advertising” only matter once we confirm the company runs ads. That check is the next piece
-        being built.
+        A finding counts as usable when it is true regardless of advertising, or when the ad check confirmed the company
+        runs the ads it depends on. Findings about Meta ads stay unconfirmed: there is no reliable Meta check yet.
       </p>
 
       <h2>Pipeline</h2>
@@ -87,18 +93,18 @@ export default async function OverviewPage() {
   );
 }
 
-function FindingRow(props: { code: string; sites: number; conditional: boolean; max: number; total: number }) {
-  const share = Math.round((props.sites / Math.max(1, props.total)) * 100);
+function FindingRow(props: { code: string; usable: number; unconfirmed: number; max: number; total: number }) {
+  const share = Math.round((props.usable / Math.max(1, props.total)) * 100);
   return (
     <>
       <div>
         <Link href={`/prospects?finding=${encodeURIComponent(props.code)}`}>{findingLabel(props.code)}</Link>
-        {props.conditional ? <span className="muted small"> · if advertising</span> : null}
+        {props.unconfirmed > 0 ? <span className="muted small"> · +{props.unconfirmed} unconfirmed</span> : null}
       </div>
-      <div className="track" title={`${props.sites} of ${props.total} audited sites (${share}%)`}>
-        <div className="fill" style={{ width: `${(props.sites / props.max) * 100}%` }} />
+      <div className="track" title={`Usable for ${props.usable} of ${props.total} audited sites (${share}%)`}>
+        <div className="fill" style={{ width: `${(props.usable / props.max) * 100}%` }} />
       </div>
-      <div className="count">{props.sites}</div>
+      <div className="count">{props.usable}</div>
     </>
   );
 }

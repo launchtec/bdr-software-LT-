@@ -3,7 +3,7 @@ import { findingLabel } from '@/audit/labels';
 import { MATURITY_LABELS, stackMaturity } from '@/audit/maturity';
 import type { Detections } from '@/audit/types';
 import { FIT_LABELS, isFitVerdict } from '@/db/fit';
-import { isConditional, listProspects, type Prospect } from '@/lib/queries';
+import { findingState, listProspects, type AdCheckRow, type Prospect } from '@/lib/queries';
 import { FitButtons } from './fit-buttons';
 
 export const dynamic = 'force-dynamic';
@@ -18,16 +18,25 @@ function installed(d: Detections): { label: string; on: boolean }[] {
   ];
 }
 
-function href(params: { finding?: string; fit?: string }): string {
+const ADS_LABELS: Record<string, string> = { active: 'Active', lapsed: 'Lapsed', none: 'None listed', unchecked: 'Not checked' };
+
+const adsKey = (ads: AdCheckRow | null) => ads?.status ?? 'unchecked';
+
+function href(params: { finding?: string; fit?: string; ads?: string }): string {
   const query = new URLSearchParams();
   if (params.finding) query.set('finding', params.finding);
   if (params.fit) query.set('fit', params.fit);
+  if (params.ads) query.set('ads', params.ads);
   const text = query.toString();
   return text ? `/prospects?${text}` : '/prospects';
 }
 
-export default async function ProspectsPage({ searchParams }: { searchParams: Promise<{ finding?: string; fit?: string }> }) {
-  const { finding, fit } = await searchParams;
+export default async function ProspectsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ finding?: string; fit?: string; ads?: string }>;
+}) {
+  const { finding, fit, ads } = await searchParams;
   const all = await listProspects();
 
   const codes = [...new Set(all.flatMap((p) => p.signals.map((s) => s.code)))].sort((a, b) =>
@@ -36,8 +45,11 @@ export default async function ProspectsPage({ searchParams }: { searchParams: Pr
 
   const matchesFit = (p: Prospect) =>
     !fit || (fit === 'unreviewed' ? p.company.fitVerdict === null : p.company.fitVerdict === fit);
-  const matchesFinding = (p: Prospect) => !finding || p.signals.some((s) => s.code === finding);
-  const shown = all.filter((p) => matchesFit(p) && matchesFinding(p));
+  // A finding that the ad check ruled out does not count as a match.
+  const matchesFinding = (p: Prospect) =>
+    !finding || p.signals.some((s) => s.code === finding && findingState(s, p.googleAds) !== 'not_applicable');
+  const matchesAds = (p: Prospect) => !ads || adsKey(p.googleAds) === ads;
+  const shown = all.filter((p) => matchesFit(p) && matchesFinding(p) && matchesAds(p));
 
   const fitOptions = [
     { key: 'unreviewed', label: 'Not reviewed', count: all.filter((p) => p.company.fitVerdict === null).length },
@@ -59,16 +71,27 @@ export default async function ProspectsPage({ searchParams }: { searchParams: Pr
       <div className="filters">
         <span className="filter-label">Your call</span>
         <div className="chips">
-          <Link href={href({ finding })} className={`chip ${fit ? '' : 'active'}`}>
+          <Link href={href({ finding, ads })} className={`chip ${fit ? '' : 'active'}`}>
             All ({all.length})
           </Link>
           {fitOptions.map((option) => (
             <Link
               key={option.key}
-              href={href({ finding, fit: option.key })}
+              href={href({ finding, ads, fit: option.key })}
               className={`chip ${fit === option.key ? 'active' : ''}`}
             >
               {option.label} ({option.count})
+            </Link>
+          ))}
+        </div>
+        <span className="filter-label">Google ads</span>
+        <div className="chips">
+          <Link href={href({ finding, fit })} className={`chip ${ads ? '' : 'active'}`}>
+            Any
+          </Link>
+          {Object.entries(ADS_LABELS).map(([key, label]) => (
+            <Link key={key} href={href({ finding, fit, ads: key })} className={`chip ${ads === key ? 'active' : ''}`}>
+              {label} ({all.filter((p) => adsKey(p.googleAds) === key).length})
             </Link>
           ))}
         </div>
@@ -76,11 +99,11 @@ export default async function ProspectsPage({ searchParams }: { searchParams: Pr
           <>
             <span className="filter-label">Finding</span>
             <div className="chips">
-              <Link href={href({ fit })} className={`chip ${finding ? '' : 'active'}`}>
+              <Link href={href({ fit, ads })} className={`chip ${finding ? '' : 'active'}`}>
                 Any
               </Link>
               {codes.map((code) => (
-                <Link key={code} href={href({ fit, finding: code })} className={`chip ${finding === code ? 'active' : ''}`}>
+                <Link key={code} href={href({ fit, ads, finding: code })} className={`chip ${finding === code ? 'active' : ''}`}>
                   {findingLabel(code)}
                 </Link>
               ))}
@@ -101,6 +124,7 @@ export default async function ProspectsPage({ searchParams }: { searchParams: Pr
                 <th>Company</th>
                 <th>Site runs</th>
                 <th>Setup</th>
+                <th>Google ads</th>
                 <th>Findings</th>
                 <th>Your call</th>
               </tr>
@@ -122,9 +146,9 @@ export default async function ProspectsPage({ searchParams }: { searchParams: Pr
 }
 
 function Row({ prospect }: { prospect: Prospect }) {
-  const { company, audit, signals } = prospect;
-  const usable = signals.filter((s) => !isConditional(s));
-  const conditional = signals.length - usable.length;
+  const { company, audit, signals, googleAds } = prospect;
+  const usable = signals.filter((s) => findingState(s, googleAds) === 'usable');
+  const unconfirmed = signals.filter((s) => findingState(s, googleAds) === 'unconfirmed').length;
   const detections = audit?.status === 'ok' ? audit.detections : null;
   const maturity = detections ? MATURITY_LABELS[stackMaturity(detections)] : null;
 
@@ -150,6 +174,22 @@ function Row({ prospect }: { prospect: Prospect }) {
         )}
       </td>
       <td style={{ whiteSpace: 'nowrap' }}>{maturity ? <span title={maturity.meaning}>{maturity.label}</span> : <span className="muted">—</span>}</td>
+      <td style={{ whiteSpace: 'nowrap' }}>
+        {googleAds ? (
+          <>
+            <a href={googleAds.sourceUrl} target="_blank" rel="noreferrer noopener" title="Open Google's Ads Transparency Center">
+              {ADS_LABELS[googleAds.status]}
+            </a>
+            {googleAds.status !== 'none' ? (
+              <div className="muted small">
+                {googleAds.adCount} ads · last {googleAds.lastShown ?? 'unknown'}
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <span className="muted small">Not checked</span>
+        )}
+      </td>
       <td>
         <div className="chips">
           {usable.map((s) => (
@@ -157,8 +197,8 @@ function Row({ prospect }: { prospect: Prospect }) {
               {findingLabel(s.code)}
             </span>
           ))}
-          {conditional > 0 ? <span className="chip off">+{conditional} if advertising</span> : null}
-          {signals.length === 0 && detections ? <span className="muted small">Nothing found</span> : null}
+          {unconfirmed > 0 ? <span className="chip off">+{unconfirmed} unconfirmed</span> : null}
+          {usable.length === 0 && unconfirmed === 0 && detections ? <span className="muted small">Nothing usable</span> : null}
         </div>
       </td>
       <td>

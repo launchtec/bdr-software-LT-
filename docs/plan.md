@@ -120,11 +120,13 @@ AI research and drafting cost is usage-based and not yet priced. Prices came fro
 ## Working assumptions
 
 - First segment: home-services companies already running Google Ads. Second: ecommerce brands on Meta.
+- Size: roughly $400K to $3M in revenue. The largest, most visible companies are out: they already have agencies and are pitched constantly.
+- Offer: $1,600 a month per channel, plus a one-time $1,000 setup per channel when ad spend is under $10K a month.
+- First goal: two good discovery calls. Quality of the list and message matters more than volume.
 - US only.
 
 ## Open decisions
 
 - LinkedIn sending mode: assist (a person clicks send) or automated. Linked Helper has been used on the account before; whether it can take per-prospect messages from this system is unverified.
-- Monthly discovery-call capacity and minimum engagement size, which set volume and how strict the fit score is.
 - Past data to import: Instantly campaign exports (to tell a deliverability problem from a messaging problem, and to build a do-not-repeat list) and Linked Helper exports (who accepted and replied; existing connections as a warm pool).
 - Hosting: the app is set up for Render's free web service with a free Neon database, which is enough to review work in progress. The free web service sleeps when idle; move to a paid instance (about $7 a month) once the app is used daily or runs scheduled work.

@@ -225,6 +225,32 @@ export const siteAudits = pgTable(
   (t) => [index('site_audits_company_idx').on(t.companyId, t.auditedAt)],
 );
 
+export const adPlatformEnum = pgEnum('ad_platform', ['google', 'meta']);
+export const adStatusEnum = pgEnum('ad_status', ['active', 'lapsed', 'none']);
+
+/** What a public ad library says about a company's advertising, as of one check. */
+export const adChecks = pgTable(
+  'ad_checks',
+  {
+    id: id(),
+    companyId: uuid('company_id')
+      .notNull()
+      .references(() => companies.id, { onDelete: 'cascade' }),
+    platform: adPlatformEnum('platform').notNull(),
+    status: adStatusEnum('status').notNull(),
+    adCount: integer('ad_count').notNull(),
+    advertisers: jsonb('advertisers').$type<{ id: string; name: string }[]>().notNull().default([]),
+    formats: jsonb('formats').$type<Record<string, number>>(),
+    /** YYYY-MM-DD */
+    firstShown: text('first_shown'),
+    lastShown: text('last_shown'),
+    sourceUrl: text('source_url').notNull(),
+    checkedAt: timestamp('checked_at', { withTimezone: true }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index('ad_checks_company_idx').on(t.companyId, t.platform, t.checkedAt)],
+);
+
 export const experiments = pgTable(
   'experiments',
   {

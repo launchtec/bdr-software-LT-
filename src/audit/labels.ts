@@ -27,6 +27,14 @@ const APPLIES_WHEN: Record<AppliesWhen, string> = {
   runs_any_ads: 'Only matters if they run paid ads (not yet confirmed)',
 };
 
+/** Says where a conditional finding stands now that ads may have been checked. */
+export function conditionLabel(appliesWhen: unknown, state: 'usable' | 'unconfirmed' | 'not_applicable'): string | null {
+  if (typeof appliesWhen !== 'string' || !(appliesWhen in APPLIES_WHEN)) return null;
+  if (state === 'usable') return 'Confirmed: they are running Google ads';
+  if (state === 'not_applicable') return 'Does not apply: no current Google ads found';
+  return APPLIES_WHEN[appliesWhen as AppliesWhen];
+}
+
 export function appliesWhenLabel(value: unknown): string | null {
   return typeof value === 'string' && value in APPLIES_WHEN ? APPLIES_WHEN[value as AppliesWhen] : null;
 }

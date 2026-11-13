@@ -1,10 +1,10 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { appliesWhenLabel, findingLabel } from '@/audit/labels';
+import { conditionLabel, findingLabel } from '@/audit/labels';
 import { MATURITY_LABELS, stackMaturity } from '@/audit/maturity';
 import type { Detections } from '@/audit/types';
 import { isFitVerdict } from '@/db/fit';
-import { getProspect } from '@/lib/queries';
+import { findingState, getProspect } from '@/lib/queries';
 import { FitButtons } from '../fit-buttons';
 
 export const dynamic = 'force-dynamic';
@@ -32,7 +32,9 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
   const { id } = await params;
   const prospect = await getProspect(id);
   if (!prospect) notFound();
-  const { company, audit, signals } = prospect;
+  const { company, audit, signals, googleAds } = prospect;
+  const applicable = signals.filter((s) => findingState(s, googleAds) !== 'not_applicable');
+  const ruledOut = signals.filter((s) => findingState(s, googleAds) === 'not_applicable');
 
   return (
     <>
@@ -66,6 +68,42 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
         ) : null}
       </div>
 
+      <h2>Google ads</h2>
+      <div className="panel" style={{ padding: '14px 18px' }}>
+        {googleAds ? (
+          <>
+            <p style={{ margin: 0 }}>
+              {googleAds.status === 'active' ? (
+                <>
+                  <strong>Running ads.</strong> {googleAds.adCount} ads listed, most recently shown {googleAds.lastShown}; the
+                  oldest first shown {googleAds.firstShown}.
+                </>
+              ) : googleAds.status === 'lapsed' ? (
+                <>
+                  <strong>Lapsed.</strong> {googleAds.adCount} ads listed, but none shown since {googleAds.lastShown}.
+                </>
+              ) : (
+                <>
+                  <strong>None listed.</strong> Google&apos;s ad library shows no ads pointing to this domain.
+                </>
+              )}
+            </p>
+            <p className="muted small" style={{ margin: '8px 0 0' }}>
+              {googleAds.advertisers.length > 0 ? <>Advertiser: {googleAds.advertisers.map((a) => a.name).join(', ')} · </> : null}
+              Checked {googleAds.checkedAt.toISOString().slice(0, 10)} ·{' '}
+              <a href={googleAds.sourceUrl} target="_blank" rel="noreferrer noopener">
+                See it in Google&apos;s Ads Transparency Center
+              </a>
+              . Ads pointing to a different domain would not appear.
+            </p>
+          </>
+        ) : (
+          <p className="muted" style={{ margin: 0 }}>
+            Not checked yet.
+          </p>
+        )}
+      </div>
+
       {audit?.status === 'not_auditable' ? (
         <div className="notice">
           <strong>This site could not be audited.</strong> {audit.error} Nothing is claimed about it.
@@ -79,19 +117,20 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
 
       {audit?.status === 'ok' ? (
         <>
-          <h2>Findings ({signals.length})</h2>
+          <h2>Findings ({applicable.length})</h2>
           <div className="panel">
-            {signals.length === 0 ? (
+            {applicable.length === 0 ? (
               <div className="empty">The audit found nothing worth raising.</div>
             ) : (
-              signals.map((s) => {
-                const condition = appliesWhenLabel(s.data?.appliesWhen);
+              applicable.map((s) => {
+                const state = findingState(s, googleAds);
+                const condition = conditionLabel(s.data?.appliesWhen, state);
                 return (
                   <div className="finding" key={s.id}>
                     <h3>
                       {findingLabel(s.code)}
                       <span className="chip">{s.confidence === 'observed' ? 'Observed directly' : 'Likely (inferred)'}</span>
-                      {condition ? <span className="chip off">{condition}</span> : null}
+                      {condition ? <span className={`chip ${state === 'usable' ? 'strong' : 'off'}`}>{condition}</span> : null}
                     </h3>
                     <p>{s.statement}</p>
                     {s.caveat ? <p className="muted small">Caveat: {s.caveat}</p> : null}
@@ -110,6 +149,12 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
               })
             )}
           </div>
+
+          {ruledOut.length > 0 ? (
+            <p className="muted small">
+              Not shown because the company has no current Google ads: {ruledOut.map((s) => findingLabel(s.code)).join(', ')}.
+            </p>
+          ) : null}
 
           {audit.detections ? (
             <>

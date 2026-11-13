@@ -13,6 +13,7 @@
     "start": "next start",
     "audit": "tsx src/cli/audit.ts",
     "audit:batch": "tsx src/cli/audit-batch.ts",
+    "adcheck": "tsx src/cli/adcheck.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",

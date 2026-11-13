@@ -6,10 +6,10 @@ export interface Stage {
 }
 
 export const PIPELINE: Stage[] = [
-  { name: 'Source', what: 'Find companies from signals instead of a bought list', state: 'later' },
+  { name: 'Source', what: 'Find right-sized companies from signals instead of a bought list', state: 'next' },
   { name: 'Find contacts', what: 'Decision-maker names from public records, verified email', state: 'later' },
   { name: 'Research: site audit', what: 'What tracking each site runs, with evidence for every finding', state: 'live' },
-  { name: 'Research: ad check', what: 'Confirm who actually advertises, so ad findings can be used', state: 'next' },
+  { name: 'Research: ad check', what: "Who runs Google ads, from Google's public ad library (Meta not yet)", state: 'live' },
   { name: 'Draft', what: 'One coordinated sequence per person, opening with a finding', state: 'later' },
   { name: 'Review', what: 'Approve, edit or reject every draft', state: 'later' },
   { name: 'Send', what: 'Email, LinkedIn and Instagram, checked against the do-not-contact list', state: 'later' },

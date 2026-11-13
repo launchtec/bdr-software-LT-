@@ -23,5 +23,5 @@ export function stackMaturity(d: Detections): StackMaturity {
 export const MATURITY_LABELS: Record<StackMaturity, { label: string; meaning: string }> = {
   built_out: { label: 'Built out', meaning: 'Analytics plus at least two of Google Ads, Meta pixel and call tracking. Probably has an agency already.' },
   partial: { label: 'Partial', meaning: 'Some tracking in place, with gaps.' },
-  bare: { label: 'Bare', meaning: 'No analytics or ad tracking. May not be advertising at all.' },
+  bare: { label: 'Bare', meaning: 'No analytics or ad tracking on the site.' },
 };

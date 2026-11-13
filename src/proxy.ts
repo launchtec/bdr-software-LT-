@@ -26,6 +26,6 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // The ingest API has its own token check; the health check and static assets are public.
-  matcher: ['/((?!api/ingest|api/health|_next/static|_next/image|favicon.ico).*)'],
+  // The ingest and export APIs have their own token check; the health check and static assets are public.
+  matcher: ['/((?!api/ingest|api/export|api/health|_next/static|_next/image|favicon.ico).*)'],
 };
